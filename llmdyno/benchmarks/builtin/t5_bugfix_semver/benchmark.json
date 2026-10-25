@@ -1,0 +1,47 @@
+{
+  "id": "t5_bugfix_semver",
+  "version": 1,
+  "title": "Fix three bugs in an existing semver library",
+  "summary": "SWE-style: reproduce three user-reported issues in a library, fix root causes, add regression tests.",
+  "description": "An existing library for semantic versions and npm-style ranges with three bug reports: prerelease precedence, hashing/equality of build metadata, and caret ranges for 0.0.x. Fix the root causes without breaking existing tests, add regression tests and a changelog entry.",
+  "category": "Bug fixing",
+  "difficulty": "medium",
+  "languages": [
+    "Python"
+  ],
+  "tags": [
+    "bugfix",
+    "existing-codebase",
+    "semver"
+  ],
+  "stages": [
+    {
+      "prompt": "prompts/stage1.md",
+      "timeout_s": 1200
+    }
+  ],
+  "grade_each_stage": false,
+  "grader": {
+    "type": "script",
+    "path": "grader/grade.py",
+    "timeout_s": 600
+  },
+  "min_context": 32000,
+  "expected_minutes": {
+    "local": 2,
+    "cloud": 1
+  },
+  "workspace": "workspace",
+  "decompress": [],
+  "reference": "reference",
+  "probes": null,
+  "quality": {
+    "language": "python"
+  },
+  "origin": "LLMDyno round 1 (October 2026)",
+  "reference_tokens": {
+    "prompt": 192815,
+    "output": 9786,
+    "cache_hit": 0.85
+  }
+}

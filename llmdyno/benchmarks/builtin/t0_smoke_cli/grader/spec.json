@@ -1,0 +1,8 @@
+{
+  "tests": "grader/tests",
+  "checks": [
+    {"name": "module_present", "type": "file_exists", "path": "wordfreq.py"},
+    {"name": "own_tests_exist", "type": "test_count", "path": "tests", "min": 3},
+    {"name": "own_tests_pass", "type": "command", "cmd": "python -m pytest -q -p no:cacheprovider tests", "expect_exit": 0}
+  ]
+}

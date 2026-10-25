@@ -1,0 +1,22 @@
+{
+  "n_customers": 4000,
+  "n_events_clean": 155533,
+  "train_churn_rate": 0.3511,
+  "median_age": 37.0,
+  "top_countries_by_revenue": [
+    "US",
+    "IN",
+    "GB"
+  ],
+  "revenue_by_month_2026": {
+    "2026-01": 31979.23,
+    "2026-02": 28591.73,
+    "2026-03": 31380.04,
+    "2026-04": 32321.91,
+    "2026-05": 22109.99,
+    "2026-06": 7272.27
+  },
+  "reference_test_auc": 0.8708,
+  "n_raw_customer_rows": 4150,
+  "n_raw_events": 159420
+}

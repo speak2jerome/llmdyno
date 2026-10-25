@@ -1,0 +1,46 @@
+{
+  "id": "t0_smoke_cli",
+  "version": 1,
+  "title": "Smoke test: word-frequency CLI",
+  "summary": "A two-minute sanity check: one small module, a CLI and three tests.",
+  "description": "Tiny task for checking that a profile and harness work end to end before a long plan: a word-frequency function with precise tie-breaking, a CLI with an error path, and the project's own tests.",
+  "category": "Smoke test",
+  "difficulty": "easy",
+  "languages": [
+    "Python"
+  ],
+  "tags": [
+    "smoke",
+    "quick"
+  ],
+  "stages": [
+    {
+      "prompt": "prompts/stage1.md",
+      "timeout_s": 600
+    }
+  ],
+  "grade_each_stage": false,
+  "grader": {
+    "type": "spec",
+    "path": "grader/spec.json",
+    "timeout_s": 300
+  },
+  "min_context": 16000,
+  "expected_minutes": {
+    "local": 1,
+    "cloud": 0.5
+  },
+  "workspace": null,
+  "decompress": [],
+  "reference": "reference",
+  "probes": null,
+  "quality": {
+    "language": "python"
+  },
+  "origin": "LLMDyno",
+  "reference_tokens": {
+    "prompt": 30000,
+    "output": 3500,
+    "cache_hit": 0.85
+  }
+}

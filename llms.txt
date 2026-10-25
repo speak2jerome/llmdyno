@@ -1,0 +1,39 @@
+# LLMDyno
+
+> LLMDyno is an open-source (MIT) local web app that benchmarks large language models as coding agents. It runs
+> open-source agent harnesses (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent) on multi-file coding
+> tasks with hidden tests, using local GGUF models through llama.cpp or cloud APIs (OpenAI, Anthropic, Google Gemini,
+> DeepSeek, Moonshot Kimi, Z.ai, Qwen, MiniMax, xAI, Mistral, OpenRouter, Groq, Together, Fireworks, Cerebras), and
+> compares correctness, code quality, speed, VRAM use and cost on one dashboard.
+
+Key facts:
+
+- Runs on x86-64 Windows and Linux with Python 3.11+ and Docker. Optional GPU: NVIDIA (CUDA 12/13), AMD (ROCm,
+  Vulkan), Intel (SYCL, Vulkan), or CPU-only.
+- Projects VRAM use from a GGUF header before download (mean error -4 MiB against llama-fit-params) and warns about
+  out-of-memory, VRAM spilling into shared system memory on Windows, CPU offload and context limits.
+- Agents run in offline Docker sandboxes; a per-run proxy holds API keys, enforces spend caps and records a
+  harness-neutral transcript.
+- Results: hidden-test correctness (50%), instruction following (15%), code quality from static analysis, behaviour
+  probes and blind LLM judges (25%), efficiency (10%); weights are adjustable. Judge agreement and self-preference are
+  reported.
+- Has a panic stop that halts every run, container and model server at once.
+- Version 0.1.0, Semantic Versioning, released 2026-10-26.
+
+Round 1 sample results (RTX 5080 16 GB, five tasks, Pi harness): GPT-6 Luna API 94.3; Qwen3.8 27B UD-Q3_K_XL 90.9
+(best local, 100% hidden tests passed); Qwen3.8 27B at IQ3_XXS 90.7 and Q2_K_XL 90.1; Qwen3.6 35B-A3B MoE 89.0 with
+experts on the CPU; Gemma 4 26B-A4B 87.2; gpt-oss-20b 48.5; Gemma 4 E2B 39.7. Two judges (Claude, GPT-6 Luna) agreed
+with Pearson r = 0.879 over 75 runs.
+
+## Docs
+
+- [README](https://github.com/speak2jerome/llmdyno/blob/main/README.md): features, quick start, results, FAQ
+- [Architecture](https://github.com/speak2jerome/llmdyno/blob/main/docs/ARCHITECTURE.md): components, run pipeline, memory model, scoring
+- [Adding a harness](https://github.com/speak2jerome/llmdyno/blob/main/docs/HARNESSES.md)
+- [Writing a benchmark](https://github.com/speak2jerome/llmdyno/blob/main/docs/BENCHMARKS.md)
+- [Changelog](https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md)
+
+## Optional
+
+- [Releasing](https://github.com/speak2jerome/llmdyno/blob/main/docs/RELEASING.md)
+- [Security policy](https://github.com/speak2jerome/llmdyno/blob/main/SECURITY.md)

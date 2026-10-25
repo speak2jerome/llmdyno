@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llmdyno"
+dynamic = ["version"]
+description = "Benchmark local and cloud LLMs as coding agents: VRAM fit checks, sandboxed harnesses, hidden tests, LLM judges and a results dashboard."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "NOTICE.md"]
+requires-python = ">=3.11"
+authors = [{ name = "speak2jerome", email = "speak2jerome@gmail.com" }]
+keywords = [
+  "llm", "benchmark", "coding-agent", "llama.cpp", "gguf", "local-llm", "vram", "llm-as-a-judge", "evaluation",
+  "openai", "anthropic", "claude", "gemini", "qwen", "gemma", "deepseek", "opencode", "codex", "aider", "swe-agent",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Web Environment",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Testing",
+]
+
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.34.0",
+  "sqlalchemy==2.0.36",
+  "pydantic==2.10.4",
+  "httpx==0.28.1",
+  "psutil==6.1.1",
+  "python-multipart==0.0.20",
+]
+
+[project.urls]
+Homepage = "https://github.com/speak2jerome/llmdyno"
+Documentation = "https://github.com/speak2jerome/llmdyno#readme"
+Changelog = "https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md"
+Issues = "https://github.com/speak2jerome/llmdyno/issues"
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4", "ruff==0.8.4"]
+
+[project.scripts]
+llmdyno = "llmdyno.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["llmdyno"]
+
+[tool.hatch.version]
+path = "llmdyno/__init__.py"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+# benchmark tasks (starter code, reference solutions, graders) are fixtures, not project code
+extend-exclude = ["llmdyno/benchmarks/builtin"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:starlette.*"]

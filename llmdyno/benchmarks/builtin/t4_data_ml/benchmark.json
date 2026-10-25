@@ -1,0 +1,50 @@
+{
+  "id": "t4_data_ml",
+  "version": 1,
+  "title": "Messy data pipeline, analysis and churn model",
+  "summary": "Clean messy CSV/JSONL exports, build features, write an analysis and train a churn classifier.",
+  "description": "A reproducible pipeline over deliberately messy raw data (inconsistent country codes, string amounts, bad ages, duplicate events): feature table, summary analysis and a churn model whose test-set predictions are scored by AUC against hidden labels.",
+  "category": "Data & ML",
+  "difficulty": "medium",
+  "languages": [
+    "Python"
+  ],
+  "tags": [
+    "pandas",
+    "scikit-learn",
+    "etl",
+    "ml"
+  ],
+  "stages": [
+    {
+      "prompt": "prompts/stage1.md",
+      "timeout_s": 1800
+    }
+  ],
+  "grade_each_stage": false,
+  "grader": {
+    "type": "script",
+    "path": "grader/grade.py",
+    "timeout_s": 900
+  },
+  "min_context": 48000,
+  "expected_minutes": {
+    "local": 3,
+    "cloud": 1.5
+  },
+  "workspace": "workspace",
+  "decompress": [
+    "data/events.jsonl.gz"
+  ],
+  "reference": "reference",
+  "probes": "probes",
+  "quality": {
+    "language": "python"
+  },
+  "origin": "LLMDyno round 1 (October 2026)",
+  "reference_tokens": {
+    "prompt": 296700,
+    "output": 11853,
+    "cache_hit": 0.85
+  }
+}

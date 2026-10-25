@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tag matches the package version
+        run: |
+          VERSION=$(python -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('llmdyno/__init__.py').read()).group(1))")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match llmdyno/__init__.py ($VERSION)"; exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Test
+        run: |
+          python -m pip install -e ".[dev]" build
+          python -m pytest -q
+      - name: Build wheel and sdist
+        run: python -m build
+      - name: Release notes from the changelog
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {on=1; next}
+            on && /^## \[/ {exit}
+            on {print}
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || echo "See CHANGELOG.md" > notes.md
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRE=""
+          case "$VERSION" in *-*) PRE="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" dist/* --title "LLMDyno $VERSION" --notes-file notes.md $PRE

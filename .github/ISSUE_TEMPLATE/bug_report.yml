@@ -1,0 +1,39 @@
+name: Bug report
+description: Something doesn't work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a local profile for ...
+        2. Run plan with harness ...
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: LLMDyno version
+      description: Shown at the bottom of the sidebar, or run `llmdyno --version`.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: system
+    attributes:
+      label: System
+      description: Paste the output of `llmdyno specs`, or describe OS, GPU, driver and Docker version.
+      render: json
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The job log from the Activity page, or the run's Logs tab. Remove anything private.
+      render: text

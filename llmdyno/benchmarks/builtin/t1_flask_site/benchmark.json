@@ -1,0 +1,49 @@
+{
+  "id": "t1_flask_site",
+  "version": 1,
+  "title": "Flask website: contact form and login",
+  "summary": "Server-rendered Flask site with an app factory, SQLite, a validated contact form, registration and login.",
+  "description": "Build a small Flask site from an empty folder: application factory, auto-created SQLite schema, Jinja templates, a contact form with validation, registration and login with hashed passwords and sessions, plus the project's own tests and README.",
+  "category": "Web app",
+  "difficulty": "easy",
+  "languages": [
+    "Python",
+    "HTML"
+  ],
+  "tags": [
+    "flask",
+    "sqlite",
+    "auth",
+    "forms"
+  ],
+  "stages": [
+    {
+      "prompt": "prompts/stage1.md",
+      "timeout_s": 1200
+    }
+  ],
+  "grade_each_stage": false,
+  "grader": {
+    "type": "script",
+    "path": "grader/grade.py",
+    "timeout_s": 600
+  },
+  "min_context": 32000,
+  "expected_minutes": {
+    "local": 2,
+    "cloud": 1.5
+  },
+  "workspace": null,
+  "decompress": [],
+  "reference": "reference",
+  "probes": "probes",
+  "quality": {
+    "language": "python"
+  },
+  "origin": "LLMDyno round 1 (October 2026)",
+  "reference_tokens": {
+    "prompt": 94393,
+    "output": 7890,
+    "cache_hit": 0.85
+  }
+}

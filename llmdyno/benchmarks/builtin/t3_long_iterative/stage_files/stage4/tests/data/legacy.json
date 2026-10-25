@@ -1,0 +1,12 @@
+{
+  "items": [
+    {"sku": "K9", "name": "Kettle", "qty": 4, "price": 19.5},
+    {"sku": "M1", "name": "Mug", "qty": 12, "price": 3.25}
+  ],
+  "history": [
+    {"sku": "M1", "delta": 10, "reason": "initial", "timestamp": "2026-01-02T09:00:00"},
+    {"sku": "K9", "delta": 5, "reason": "initial", "timestamp": "2026-01-02T09:05:00"},
+    {"sku": "M1", "delta": 2, "reason": "restock", "timestamp": "2026-01-03T10:00:00"},
+    {"sku": "K9", "delta": -1, "reason": "sale", "timestamp": "2026-01-04T11:30:00"}
+  ]
+}

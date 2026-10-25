@@ -1,0 +1,28 @@
+name: New harness, benchmark or provider
+description: Propose an agent harness, a benchmark task or a cloud provider preset
+labels: [catalog]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What to add
+      options: [Harness, Benchmark, Cloud provider]
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      description: Repository, docs or API reference.
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it's worth adding
+      description: For a benchmark, what skill it tests that the built-in tasks don't. For a harness, what's different about it.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Licence, API styles it speaks, how it's installed, known quirks.

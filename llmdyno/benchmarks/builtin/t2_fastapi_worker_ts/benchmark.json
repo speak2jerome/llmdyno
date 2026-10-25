@@ -1,0 +1,49 @@
+{
+  "id": "t2_fastapi_worker_ts",
+  "version": 1,
+  "title": "FastAPI service with a worker and a TypeScript client",
+  "summary": "FastAPI backend, separate background worker, job queue in SQLite and a typed TypeScript frontend.",
+  "description": "A multi-process web application: a FastAPI API that enqueues text-processing jobs in SQLite, a worker process that claims and runs them, and a TypeScript frontend that compiles with tsc. Tests check the API contract, worker semantics and the frontend build.",
+  "category": "Web app",
+  "difficulty": "hard",
+  "languages": [
+    "Python",
+    "TypeScript"
+  ],
+  "tags": [
+    "fastapi",
+    "worker",
+    "typescript",
+    "sqlite"
+  ],
+  "stages": [
+    {
+      "prompt": "prompts/stage1.md",
+      "timeout_s": 2100
+    }
+  ],
+  "grade_each_stage": false,
+  "grader": {
+    "type": "script",
+    "path": "grader/grade.py",
+    "timeout_s": 600
+  },
+  "min_context": 48000,
+  "expected_minutes": {
+    "local": 4,
+    "cloud": 1.5
+  },
+  "workspace": null,
+  "decompress": [],
+  "reference": "reference",
+  "probes": "probes",
+  "quality": {
+    "language": "python"
+  },
+  "origin": "LLMDyno round 1 (October 2026)",
+  "reference_tokens": {
+    "prompt": 317887,
+    "output": 17771,
+    "cache_hit": 0.85
+  }
+}

@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use LLMDyno in your work, please cite it as below."
+title: "LLMDyno: benchmark local and cloud LLMs as coding agents"
+abstract: >-
+  LLMDyno runs open-source coding-agent harnesses against multi-file tasks with hidden tests, on local models
+  (llama.cpp, GGUF) or cloud APIs, with VRAM fit projection, sandboxed execution, spend caps, blind LLM judging and a
+  results dashboard comparing correctness, code quality, speed, memory and cost.
+type: software
+authors:
+  - alias: speak2jerome
+    email: speak2jerome@gmail.com
+repository-code: "https://github.com/speak2jerome/llmdyno"
+url: "https://github.com/speak2jerome/llmdyno"
+license: MIT
+version: 0.1.0
+date-released: "2026-10-26"
+keywords:
+  - large language models
+  - LLM benchmark
+  - coding agents
+  - llama.cpp
+  - GGUF
+  - local LLM
+  - LLM-as-a-judge
+  - VRAM
