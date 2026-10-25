@@ -48,7 +48,7 @@ Changelog = "https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md"
 Issues = "https://github.com/speak2jerome/llmdyno/issues"
 
 [project.optional-dependencies]
-dev = ["pytest==8.3.4", "ruff==0.8.4"]
+dev = ["pytest==9.1.1", "ruff==0.8.4"]
 
 [project.scripts]
 llmdyno = "llmdyno.__main__:main"
