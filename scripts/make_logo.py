@@ -207,10 +207,33 @@ def icon_svg(names):
             f'{svg_rects(names)}\n</svg>\n')
 
 
+# 5-wide pixel glyphs for the wordmark (rows 0-6 cap height, 7-8 descender), drawn as rects so the banner looks the
+# same everywhere: GitHub renders README SVGs as images, which cannot load web fonts
+GLYPHS = {
+    "L": ["#....", "#....", "#....", "#....", "#....", "#....", "#####", ".....", "....."],
+    "M": ["#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#", ".....", "....."],
+    "D": ["####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####.", ".....", "....."],
+    "y": [".....", ".....", "#...#", "#...#", "#...#", "#...#", ".####", "....#", ".###."],
+    "n": [".....", ".....", "####.", "#...#", "#...#", "#...#", "#...#", ".....", "....."],
+    "o": [".....", ".....", ".###.", "#...#", "#...#", "#...#", ".###.", ".....", "....."],
+}
+
+
+def pixel_text(text, x, y, px, colors):
+    """Rects for `text` in the pixel font; colors[i] is the fill for character i."""
+    out = []
+    for i, ch in enumerate(text):
+        for r, row in enumerate(GLYPHS[ch]):
+            for c, bit in enumerate(row):
+                if bit == "#":
+                    out.append(f'<rect x="{x + (i * 6 + c) * px}" y="{y + r * px}" width="{px}" height="{px}" fill="{colors[i]}"/>')
+    return "".join(out)
+
+
 def banner_svg(names):
     """1280x640 social preview / README banner: the mascot at 10x, the wordmark and a tagline."""
-    pix = "'Press Start 2P', 'Courier New', ui-monospace, monospace"
     sans = "Inter, 'Segoe UI', Helvetica, Arial, sans-serif"
+    word = pixel_text("LLMDyno", 642, 196, 9, ["#f1f0fa"] * 3 + ["#fb923c"] * 4)
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="LLMDyno: benchmark local and cloud LLMs as coding agents">
   <title>LLMDyno: put your LLM on the dyno</title>
   <rect width="1280" height="640" fill="#14132e"/>
@@ -219,11 +242,11 @@ def banner_svg(names):
     <path d="{tile_path()}" fill="{PALETTE["bg"]}"/>
 {svg_rects(names, "    ")}
   </g>
-  <text x="640" y="262" font-family="{pix}" font-size="64" fill="#f1f0fa">LLM<tspan fill="#fb923c">Dyno</tspan></text>
+  <g shape-rendering="crispEdges">{word}</g>
   <text x="642" y="336" font-family="{sans}" font-size="32" font-weight="600" fill="#f1f0fa">Put your LLM on the dyno.</text>
   <text x="642" y="388" font-family="{sans}" font-size="24" fill="#bdbcd6">Benchmark local and cloud models as coding agents:</text>
   <text x="642" y="422" font-family="{sans}" font-size="24" fill="#bdbcd6">VRAM fit, speed, cost, correctness and code quality.</text>
-  <text x="642" y="488" font-family="{sans}" font-size="20" fill="#8b8bf0">llama.cpp · OpenAI · Anthropic · Gemini · DeepSeek · Kimi · Qwen · and more</text>
+  <text x="642" y="488" font-family="{sans}" font-size="19" fill="#8b8bf0">llama.cpp · OpenAI · Anthropic · Gemini · DeepSeek · Qwen</text>
 </svg>
 '''
 
