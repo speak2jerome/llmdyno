@@ -1,9 +1,13 @@
 version: 2
+# one grouped pull request per ecosystem and month, instead of one per package
 updates:
   - package-ecosystem: pip
     directory: /
     schedule:
       interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /frontend
     schedule:
@@ -15,3 +19,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
