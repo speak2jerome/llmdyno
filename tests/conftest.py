@@ -52,7 +52,7 @@ class Recorder:
         reply = self.replies[op]
         return reply(**kwargs) if callable(reply) else reply
 
-    def subscribe(self, fn, topics):
+    def subscribe(self, fn, wanted, names=()):
         return None
 
     def ops(self):
@@ -156,3 +156,61 @@ def write_finished_run(plan_id, run_id, profile_id, t0, benchmark_id="t0_smoke_c
                      metrics={"tests_passed": 3, "tests_total": 3, "generated_tokens": 50}))
         s.commit()
     return run_dir
+
+
+# ------------------------------------------------------------------ the library over HTTP (remote mode)
+_REMOTE: dict = {}
+
+
+def safe_app_client():
+    """A TestClient running the real app (lifespan included) that never touches this machine's containers."""
+    from fastapi.testclient import TestClient
+
+    from llmdyno import safety
+    from llmdyno.runner import sandbox
+    from llmdyno.server import app
+    mp = pytest.MonkeyPatch()
+    mp.setattr(sandbox, "cleanup_stale", lambda: 0)
+    mp.setattr(safety, "_docker", lambda *a, **k: None)
+    mp.setattr(safety, "kill_stray_llama_servers", lambda: 0)
+    client = TestClient(app)
+    client.__enter__()
+    return client, mp
+
+
+def remote_backend():
+    """One RemoteBackend for the session, talking HTTP to the app in this process."""
+    if "backend" not in _REMOTE:
+        from llmdyno.sdk.remote import RemoteBackend
+        client, mp = safe_app_client()
+        _REMOTE.update(backend=RemoteBackend("http://testserver", client=client), client=client, mp=mp)
+    return _REMOTE["backend"]
+
+
+def pytest_generate_tests(metafunc):
+    """Every library test in tests/test_sdk_*.py runs twice: in-process, and through the web API (remote mode)."""
+    if metafunc.module.__name__.startswith("test_sdk_") and "sdk_backend" in metafunc.fixturenames:
+        metafunc.parametrize("sdk_backend", ["local", "remote"], indirect=True)
+
+
+@pytest.fixture(autouse=True)
+def sdk_backend(request):
+    which = getattr(request, "param", "local")
+    if which == "local":
+        yield which
+        return
+    from llmdyno.sdk import _backend
+    prev = _backend.use(remote_backend())
+    try:
+        yield which
+    finally:
+        if prev is None:
+            _backend._current["backend"] = None
+        else:
+            _backend.use(prev)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if "client" in _REMOTE:
+        _REMOTE["client"].__exit__(None, None, None)
+        _REMOTE["mp"].undo()

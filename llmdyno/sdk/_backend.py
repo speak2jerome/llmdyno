@@ -25,8 +25,9 @@ class Backend:
         """Run the service function `op` ("area.function") with keyword arguments and return its result."""
         raise NotImplementedError
 
-    def subscribe(self, fn, topics):
-        """Call fn(msg) for live events whose topic passes topics(topic); return a function that unsubscribes.
+    def subscribe(self, fn, wanted, names=()):
+        """Call fn(msg) for live events whose topic passes wanted(topic). names are the topics to ask for (a remote
+        server sends only what was asked for); more can be added later with the returned Subscription's add().
         A backend without live events returns None and watch() falls back to polling."""
         return None
 
@@ -67,12 +68,12 @@ class LocalBackend(Backend):
                 raise
             raise err from e
 
-    def subscribe(self, fn, topics):
+    def subscribe(self, fn, wanted, names=()):
         """In-process events: plans, downloads and reviews started from this process publish here directly.
         (Work running in another process, such as a separate web server, is seen by watch() through polling.)"""
         from .. import events
-        events.add_listener(fn, topics)
-        return lambda: events.remove_listener(fn)
+        events.add_listener(fn, wanted)
+        return Subscription(close=lambda: events.remove_listener(fn))
 
 
 def resolve(op: str):
@@ -81,6 +82,22 @@ def resolve(op: str):
     if not name or area.startswith("_") or name.startswith("_"):
         raise ValueError(f"not a service operation: {op!r}")
     return getattr(importlib.import_module(f"llmdyno.services.{area}"), name)
+
+
+class Subscription:
+    """A live-event subscription: add(topic) asks for one more topic, close() ends it."""
+
+    def __init__(self, close=None, add=None):
+        self._close, self._add = close, add
+
+    def add(self, topic: str) -> None:
+        if self._add:
+            self._add(topic)
+
+    def close(self) -> None:
+        if self._close:
+            self._close()
+            self._close = None
 
 
 _exit_hook = {"done": False}

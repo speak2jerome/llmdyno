@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 
-from . import __version__, config, db, errors, events, jobs, safety
+from . import __version__, auth, config, db, errors, events, jobs, safety
 from .api import external_api, results_api, routes
 from .inference import llamacpp
 from .runner import sandbox
@@ -51,10 +51,32 @@ for _cls in (errors.LLMDynoError, KeyError, ValueError, PermissionError, FileExi
     app.add_exception_handler(_cls, _error)
 
 
+@app.middleware("http")
+async def remote_access(request, call_next):
+    """This machine needs nothing; other machines need the API token (auth.py). Changes they make are logged."""
+    if not request.url.path.startswith("/api"):
+        return await call_next(request)                  # the web UI's own files carry no data
+    client = request.client.host if request.client else None
+    if auth.is_local(client, request.headers):
+        return await call_next(request)
+    if not auth.check(auth.presented(request.headers, request.query_params)):
+        return JSONResponse({"detail": auth.refusal()}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
+    response = await call_next(request)
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        forwarded = request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip")
+        auth.log_request(forwarded or client, request.method, request.url.path, response.status_code)
+    return response
+
+
 @app.websocket("/ws")
 async def ws(socket: WebSocket):
     """One socket per browser tab. The writer waits on the reader too, so a closed tab is cleaned up at once instead
-    of at the next ping; a client too slow to keep up is told to resync instead of silently missing events."""
+    of at the next ping; a client too slow to keep up is told to resync instead of silently missing events.
+    Remote clients pass the API token as ?token= (browsers cannot set headers on a WebSocket)."""
+    client = socket.client.host if socket.client else None
+    if not auth.is_local(client, socket.headers) and not auth.check(auth.presented(socket.headers, socket.query_params)):
+        await socket.close(code=1008)
+        return
     await socket.accept()
     q = events.ClientQueue()
     events.subscribe("jobs", q)

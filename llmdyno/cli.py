@@ -23,14 +23,14 @@ import webbrowser
 from pathlib import Path
 
 # hand-written commands (unchanged from before the generated CLI)
-CUSTOM = ("serve", "doctor", "specs", "ci")
+CUSTOM = ("serve", "doctor", "specs", "ci", "token")
 # library classes whose methods become `llmdyno <group> <method> ID ...`, with the function that finds one by id
 GROUPS = {"Profile": ("profile", "profile"), "Model": ("model", "model"), "Provider": ("provider", "provider"),
           "Harness": ("harness", "harness"), "Benchmark": ("benchmark", "benchmark"), "Suite": ("suite", "suite"),
           "Plan": ("plan", "plan"), "Run": ("run", "run"), "Job": ("job", "job")}
 GETTERS = {g for _, g in GROUPS.values()}
 GETTER_OF = {group: getter for group, getter in GROUPS.values()}
-NOT_COMMANDS = {"init",                                   # --data DIR instead
+NOT_COMMANDS = {"init", "connect", "disconnect", "connection",   # --data DIR, --url / --token instead
                 "inspect_task", "import_inspect_samples"}     # take or return Python objects (Inspect tasks, datasets)
 SKIP_METHODS = {"refresh", "to_dict", "get"}
 NO_CLI_PARAMS = {"on_event", "_stop", "quiet"}            # callbacks, internals; quiet follows --json
@@ -124,6 +124,10 @@ def build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", help="machine-readable output")
     common.add_argument("--data", metavar="DIR", help="data folder (default: LLMDYNO_DATA or the usual one)")
+    common.add_argument("--url", metavar="URL", default=None,
+                        help="run the command on a LLMDyno server (default: LLMDYNO_URL, else this machine)")
+    common.add_argument("--api-token", metavar="TOKEN", default=None,
+                        help="that server's access token (default: LLMDYNO_TOKEN)")
     ap = argparse.ArgumentParser(prog="llmdyno", description="Benchmark local and cloud LLMs as coding agents. "
                                  "Every command is also a Python call: see docs/LIBRARY.md.", parents=[common])
     ap.add_argument("--version", action="version", version=f"llmdyno {__version__}")
@@ -136,6 +140,10 @@ def build_parser():
     sv.add_argument("--open", action="store_true", help="open the browser")
     sub.add_parser("doctor", parents=[common], help="check system specs and dependencies")
     sub.add_parser("specs", parents=[common], help="print detected hardware as JSON")
+    tk = sub.add_parser("token", parents=[common], help="the access token remote clients need (made on first use)",
+                        description="Print the API token remote clients and browsers must present. It is shown when "
+                                    "it is made; --rotate replaces it (the old one stops working at once).")
+    tk.add_argument("--rotate", action="store_true", help="make a new token")
     ci = sub.add_parser("ci", parents=[common], help="fail (exit 1) when scores dropped against a baseline",
                         description="Compare results with a baseline for CI: exit 1 when a configuration's score "
                                     "dropped by more than --max-drop points or is missing.")
@@ -275,6 +283,38 @@ def _call(entry, a):
     return fn(*args, **kwargs)
 
 
+def remote_notice(host: str) -> str | None:
+    """What `serve` says when it listens beyond this machine: the token the first time, a reminder after."""
+    import ipaddress
+    try:
+        local = ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        local = host == "localhost"
+    if local:
+        return None
+    from . import auth
+    tok, created = auth.ensure_token()
+    if created:
+        return (f"Remote access is on. Access token (shown once; `llmdyno token --rotate` replaces it):\n  {tok}\n"
+                "Clients: llmdyno.connect(url, token=...) or LLMDYNO_TOKEN; browsers ask for it. Use HTTPS or an SSH "
+                "tunnel across networks you do not trust.")
+    return "Remote access is on: clients need the access token (`llmdyno token --rotate` makes a new one)."
+
+
+def _token(a):
+    from . import auth
+    if a.rotate:
+        print(auth.rotate())
+        return 0
+    tok, created = auth.ensure_token()
+    if created:
+        print(tok)
+    else:
+        print("A token already exists and is shown only when it is made; `llmdyno token --rotate` makes a new one "
+              "(clients using the old one must update).", file=sys.stderr)
+    return 0
+
+
 def _serve(a):
     import uvicorn
 
@@ -283,6 +323,9 @@ def _serve(a):
     port = a.port or int(config.get("port"))
     url = f"http://{host}:{port}"
     print(f"LLMDyno on {url}  (data: {config.DATA})", flush=True)
+    note = remote_notice(host)
+    if note:
+        print(note, flush=True)
     if a.open:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run("llmdyno.server:app", host=host, port=port, log_level="warning")
@@ -336,6 +379,16 @@ def main(argv=None) -> int:
     from .errors import LLMDynoError, PreflightError
     if a.data:
         lib.init(a.data)                         # otherwise the library opens the usual folder on first use
+    import os
+    url = a.url or (os.environ.get("LLMDYNO_URL") if a.cmd not in ("serve", "token") else None)
+    if url and a.cmd not in ("serve", "token"):
+        try:
+            lib.connect(url, a.api_token)
+        except LLMDynoError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+    if a.cmd == "token":
+        return _token(a)
     if a.cmd == "serve":
         return _serve(a)
     if a.cmd == "doctor":

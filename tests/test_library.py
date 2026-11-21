@@ -140,7 +140,8 @@ def test_sdk_modules_only_reach_llmdyno_through_the_backend():
     import pathlib
     allowed = {"errors", "__version__", "integrations"}
     local_only = {"_backend.py": {"config", "db", "events", "inference"}, "_core.py": {"config"}, "ui.py": {"config"},
-                  "parity.py": {"sdk", "server"}}           # parity reads the local route table
+                  "parity.py": {"sdk", "server"},
+                  "remote.py": {"server"}}                  # the route table of this version, to map calls to URLs           # parity reads the local route table
     sdk = pathlib.Path(llmdyno.__file__).parent / "sdk"
     for f in sdk.glob("*.py"):
         for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):

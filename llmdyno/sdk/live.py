@@ -115,16 +115,21 @@ def watch(target, *, transcript: bool = False, gpu: bool = True, timeout: float 
         if ev_kind in ("transcript", "proxy") and not transcript:
             return
         if ev_kind == "run" and isinstance(msg["data"], dict):
-            runs.add(msg["data"].get("id"))
+            rid = msg["data"].get("id")
+            if transcript and sub is not None and rid not in runs:
+                sub.add(f"run:{rid}")
+            runs.add(rid)
         q.put(Event(ev_kind, msg["topic"], msg["data"], msg["ts"]))
 
-    unsubscribe = backend().subscribe(on_msg, wanted)
+    sub = backend().subscribe(on_msg, wanted, [f"{kind}:{tid}"])
     deadline = None if timeout is None else time.time() + timeout
     try:
         first = snapshot()
         if kind == "plan":
             for r in first.get("runs") or []:
                 last[r["id"]] = r["status"]
+                if transcript and sub is not None:
+                    sub.add(f"run:{r['id']}")
         last[tid] = first["status"]
         if _stopped(kind, first):
             yield Event(kind, f"{kind}:{tid}", first, time.time())
@@ -169,8 +174,8 @@ def watch(target, *, transcript: bool = False, gpu: bool = True, timeout: float 
                 if _stopped(kind, d):
                     return
     finally:
-        if unsubscribe:
-            unsubscribe()
+        if sub is not None:
+            sub.close()
 
 
 def _stopped(kind: str, d: dict) -> bool:

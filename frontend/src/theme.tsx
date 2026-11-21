@@ -1,5 +1,6 @@
 // Light / dark / system theme, persisted in settings (server) with a local cache for first paint.
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { authHeaders } from "./api";
 
 type Pref = "light" | "dark" | "system";
 const Ctx = createContext<{ pref: Pref; resolved: "light" | "dark"; setPref: (p: Pref) => void }>({
@@ -41,7 +42,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* storage unavailable */
       }
-      fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme: p }) }).catch(() => undefined);
+      fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ theme: p }) }).catch(() => undefined);
     },
   }), [pref, resolved]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

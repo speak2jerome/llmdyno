@@ -31,6 +31,7 @@ from .sdk import plans as _plans
 from .sdk import profiles as _profiles
 from .sdk import providers as _providers
 from .sdk import references as _references
+from .sdk import remote as _remote
 from .sdk import results as _results
 from .sdk import runs as _runs
 from .sdk import settings as _settings
@@ -49,6 +50,7 @@ from .sdk.profiles import *  # noqa: F401,F403
 from .sdk.profiles import _params  # noqa: F401 - kept for code written against 0.3
 from .sdk.providers import *  # noqa: F401,F403
 from .sdk.references import *  # noqa: F401,F403
+from .sdk.remote import *  # noqa: F401,F403
 from .sdk.results import *  # noqa: F401,F403
 from .sdk.runs import *  # noqa: F401,F403
 from .sdk.settings import *  # noqa: F401,F403
@@ -56,7 +58,7 @@ from .sdk.system import *  # noqa: F401,F403
 from .sdk.ui import *  # noqa: F401,F403
 
 _AREAS = (_system, _profiles, _models, _providers, _harnesses, _agents, _benchmarks, _plans, _runs, _results, _judging,
-          _references, _settings, _live, _interop, _ui)
+          _references, _settings, _live, _interop, _remote, _ui)
 
 __all__ = ["LLMDynoError", "InvalidError", "ForbiddenError", "NotFoundError", "ConflictError", "RiskNotAcknowledgedError",
            "RateLimitError", "UpstreamError", "InsufficientStorageError", "PreflightError", "Job", "job", "init",

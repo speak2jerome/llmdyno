@@ -61,6 +61,16 @@ def serve(port: int | None = None, *, open_browser: bool = True, block: bool = T
 
 
 def _open_ui(path: str) -> str:
+    b = backend()
+    if not isinstance(b, LocalBackend):                   # connected to a remote LLMDyno: open its dashboard
+        from urllib.parse import quote
+        base = getattr(b, "ui_url", None)
+        if not base:
+            raise LLMDynoError("this connection has no dashboard to open")
+        token = getattr(b, "token", None)
+        url = base + path + (f"#token={quote(token)}" if token else "")    # the page keeps it; it never reaches logs
+        webbrowser.open(url)
+        return base + path
     url = _ui_url()
     if not _ui_up(url):
         serve(open_browser=False, block=False)

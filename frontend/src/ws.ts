@@ -4,6 +4,7 @@
 // change, proxy restart) and the hub reconnects on its own. Events missed while disconnected, or dropped because the
 // tab could not keep up, are recovered by a "resync": every listener refetches what it shows.
 import { useEffect, useRef, useState } from "react";
+import { withToken } from "./api";
 
 export type WsMsg = { topic: string; kind: string; data: any; ts: number };
 type Handler = (m: WsMsg) => void;
@@ -32,12 +33,13 @@ class Hub {
     };
     window.addEventListener("online", wake);
     document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && wake());
+    window.addEventListener("llmdyno:token", wake);     // an access token was just entered: connect with it now
   }
 
   connect() {
     this.retry = null;
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    const ws = new WebSocket(withToken(`${proto}://${location.host}/ws`));
     this.ws = ws;
     ws.onopen = () => {
       this.backoff = 500;
