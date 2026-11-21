@@ -9,6 +9,16 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-22
+
+### Added
+
+- LLMDyno is on PyPI: `pip install llmdyno`. Releases publish there automatically through trusted publishing.
+
+### Fixed
+
+- The README's images and links are absolute, so they work on the PyPI project page too (a test keeps them that way).
+
 ## [0.3.0] - 2026-11-22
 
 ### Added
@@ -115,7 +125,8 @@ First public release.
   title follow it.
 - Bundled sample results: 15 configurations × 5 tasks on an RTX 5080, judged by two models.
 
-[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/speak2jerome/llmdyno/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/speak2jerome/llmdyno/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/speak2jerome/llmdyno/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/speak2jerome/llmdyno/releases/tag/v0.1.0

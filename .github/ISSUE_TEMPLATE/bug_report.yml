@@ -22,7 +22,7 @@ body:
     attributes:
       label: LLMDyno version
       description: Shown at the bottom of the sidebar, or run `llmdyno --version`.
-      placeholder: "0.3.0"
+      placeholder: "0.3.1"
     validations:
       required: true
   - type: textarea
