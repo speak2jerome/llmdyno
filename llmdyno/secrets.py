@@ -9,7 +9,7 @@ import json
 import os
 import threading
 
-from .config import DATA
+from . import config
 
 _lock = threading.Lock()
 IS_WIN = os.name == "nt"
@@ -33,7 +33,7 @@ def _dpapi(data, protect):
 
 
 def _path():
-    return DATA / "secrets.json"
+    return config.DATA / "secrets.json"
 
 
 def _load():
@@ -44,7 +44,7 @@ def _load():
 
 
 def _save(d):
-    DATA.mkdir(parents=True, exist_ok=True)
+    config.DATA.mkdir(parents=True, exist_ok=True)
     tmp = _path().with_suffix(".tmp")
     tmp.write_text(json.dumps(d, indent=1), encoding="utf-8")
     if not IS_WIN:

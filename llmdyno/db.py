@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-from .config import DATA
+from . import config
 
 
 def new_id(prefix):
@@ -174,8 +174,10 @@ Session = None
 
 def init(url=None):
     global engine, Session
-    DATA.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(url or f"sqlite:///{DATA / 'llmdyno.db'}", connect_args={"check_same_thread": False})
+    config.DATA.mkdir(parents=True, exist_ok=True)
+    if engine is not None:
+        engine.dispose()                      # re-opening (the library switched data folders)
+    engine = create_engine(url or f"sqlite:///{config.DATA / 'llmdyno.db'}", connect_args={"check_same_thread": False})
 
     @event.listens_for(engine, "connect")
     def _pragmas(conn, _):

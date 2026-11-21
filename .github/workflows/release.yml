@@ -28,6 +28,10 @@ jobs:
           python -m pytest -q
       - name: Build wheel and sdist
         run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - name: Release notes from the changelog
         run: |
           awk -v v="$VERSION" '
@@ -43,3 +47,20 @@ jobs:
           PRE=""
           case "$VERSION" in *-*) PRE="--prerelease";; esac
           gh release create "$GITHUB_REF_NAME" dist/* --title "LLMDyno $VERSION" --notes-file notes.md $PRE
+
+  # PyPI, so `pip install llmdyno` works. Off until the repository variable PUBLISH_PYPI is "true" and PyPI has a
+  # trusted publisher for this repository and workflow (pypi.org > your project or pending publisher > Publishing:
+  # owner speak2jerome, repository llmdyno, workflow release.yml, environment pypi). No token is stored anywhere.
+  pypi:
+    needs: release
+    if: vars.PUBLISH_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

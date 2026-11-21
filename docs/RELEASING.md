@@ -36,3 +36,14 @@ time from `frontend/package.json`, which the bump script keeps in step. CI fails
 
 5. The **Release** workflow checks that the tag matches `__version__`, runs the tests, builds the wheel and source
    archive, and publishes a GitHub release with the changelog section as its notes.
+
+## Publishing to PyPI
+
+The Release workflow also uploads the wheel and source archive to PyPI, so `pip install llmdyno` works, once two
+things are set up (both one-time, no token is stored):
+
+1. On pypi.org, add a trusted publisher (a "pending publisher" before the first upload): owner `speak2jerome`,
+   repository `llmdyno`, workflow `release.yml`, environment `pypi`.
+2. In the GitHub repository settings, add the variable `PUBLISH_PYPI` with the value `true`.
+
+Until then the PyPI job is skipped and releases go to GitHub only.

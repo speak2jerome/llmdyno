@@ -32,7 +32,7 @@ a leaderboard says it does on someone else's.
 
 - [Why LLMDyno](#why-llmdyno)
 - [Features](#features)
-- [Quick start](#quick-start)
+- [Quick start](#quick-start) · [Use it from Python](#use-it-from-python)
 - [Round 1 results: 15 configurations on an RTX 5080](#round-1-results-15-configurations-on-an-rtx-5080)
 - [Public benchmarks: SWE-bench, Aider polyglot, Artificial Analysis](#public-benchmarks-swe-bench-aider-polyglot-artificial-analysis)
 - [How it works](#how-it-works)
@@ -98,6 +98,9 @@ runs share the GPU one model at a time while cloud runs go in parallel. Pause, r
 **Judging**: blind, shuffled LLM code review with an editable rubric and as many judges as you like, local or cloud.
 LLMDyno reports how much the judges agree and whether a judge favours its own vendor's models.
 
+**Python API**: `import llmdyno` and do all of the above from a script or notebook: `cloud_model()`, `local_model()`,
+`bench()`, `Results.to_pandas()`. Same engine and data folder as the app.
+
 **Results dashboard**: weighted leaderboard with 95% confidence intervals, per-benchmark heatmap, radar profiles, a
 cost/speed/quality scatter with the Pareto front, consistency (pass@k, pass^k), token use, harness comparison, rubric
 heatmap, side-by-side compare, and CSV/JSON export. Vendor and model-family logos everywhere.
@@ -151,6 +154,25 @@ Other commands: `llmdyno doctor` (check dependencies), `llmdyno specs` (print th
 `llmdyno --version`. Data lives in `./data` inside the checkout (or `%LOCALAPPDATA%\LLMDyno`,
 `~/Library/Application Support/LLMDyno` or `~/.local/share/llmdyno` for a pip install), or wherever `LLMDYNO_DATA`
 points.
+
+## Use it from Python
+
+Everything the app does is also a library. Describe the models, call `bench()`, get scored results:
+
+```python
+import llmdyno
+
+gpt = llmdyno.cloud_model("openai", "gpt-6-luna", reasoning_effort="low", budget_usd=2)   # key from OPENAI_API_KEY
+qwen = llmdyno.local_model("unsloth/Qwen3.8-27B-GGUF", quant="UD-Q3_K_XL", ctx=49152)    # downloads once
+
+results = llmdyno.bench([gpt, qwen], benchmarks="suite_quick", harnesses="pi")
+print(results)                      # leaderboard; results.to_pandas(), .to_csv(), .open() for the dashboard
+```
+
+`llmdyno.setup()` installs what is missing (images, llama.cpp), `bench()` checks the plan before it starts and raises
+`PreflightError` with the reasons, and Ctrl+C cancels cleanly. It shares the app's data folder, so plans started from
+Python appear in the dashboard. The full guide, including SWE-bench, judges and the data folder:
+[docs/LIBRARY.md](docs/LIBRARY.md). Runnable examples are in [examples/](examples/).
 
 ## Round 1 results: 15 configurations on an RTX 5080
 

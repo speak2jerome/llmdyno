@@ -1,4 +1,5 @@
-"""Command line: `llmdyno` starts the web app; `llmdyno doctor` prints the setup checks."""
+"""Command line: `llmdyno` starts the web app; `llmdyno doctor` prints the setup checks.
+From Python, `import llmdyno` gives the same features as a library (see docs/LIBRARY.md)."""
 import argparse
 
 from . import __version__
@@ -25,7 +26,7 @@ def main(argv=None):
         from .system import deps, specs
         s = specs.detect(force=True)
         if not s["os"]["arch_supported"]:
-            print(f"Unsupported architecture {s['os']['arch']}: LLMDyno supports x86-64 for now.")
+            print(f"Unsupported architecture {s['os']['arch']}: LLMDyno supports x86-64 and ARM64.")
             return 2
         for n in s["summary"]["notes"]:
             print(f"[{n['level']}] {n['text']}")

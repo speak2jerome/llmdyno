@@ -28,22 +28,31 @@ def test_changelog_has_this_release():
     assert f"## [{__version__}]" in text and "## [Unreleased]" in text
 
 
+BUMPED = {"INIT": "llmdyno/__init__.py", "PKG": "frontend/package.json", "LOCK": "frontend/package-lock.json",
+          "CHANGELOG": "CHANGELOG.md", "CITATION": "CITATION.cff", "BUG_TEMPLATE": ".github/ISSUE_TEMPLATE/bug_report.yml"}
+
+
 def test_bump_script(tmp_path, monkeypatch):
-    for rel in ("llmdyno/__init__.py", "frontend/package.json", "frontend/package-lock.json", "CHANGELOG.md"):
-        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(ROOT / rel, tmp_path / rel)
     mod = runpy.run_path(str(ROOT / "scripts/bump_version.py"), run_name="bump")
     g = mod["main"].__globals__
-    g.update(INIT=tmp_path / "llmdyno/__init__.py", PKG=tmp_path / "frontend/package.json",
-             LOCK=tmp_path / "frontend/package-lock.json", CHANGELOG=tmp_path / "CHANGELOG.md")
+    # every path the script writes must be redirected here, or the test edits the real repository
+    targets = {k for k, v in g.items() if k.isupper() and isinstance(v, Path) and v.suffix and v != ROOT}
+    assert targets == set(BUMPED), f"bump_version.py writes {sorted(targets)}; add them to BUMPED in this test"
+    before = {rel: (ROOT / rel).read_bytes() for rel in BUMPED.values()}
+    for name, rel in BUMPED.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / rel, tmp_path / rel)
+        g[name] = tmp_path / rel
     monkeypatch.setattr(sys, "argv", ["bump_version.py", "minor"])
     mod["main"]()
+    assert {rel: (ROOT / rel).read_bytes() for rel in BUMPED.values()} == before, "the test changed real files"
     major, minor, _ = (int(x) for x in __version__.split("-")[0].split("."))
     new = f"{major}.{minor + 1}.0"
     assert f'__version__ = "{new}"' in (tmp_path / "llmdyno/__init__.py").read_text()
     assert json.loads((tmp_path / "frontend/package.json").read_text())["version"] == new
     changelog = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{new}] - " in changelog and f"[{new}]: https://github.com/speak2jerome/llmdyno/compare/v{__version__}...v{new}" in changelog
+    assert f"version: {new}" in (tmp_path / "CITATION.cff").read_text(encoding="utf-8")
 
 
 def test_database_schema_version(tmp_path):

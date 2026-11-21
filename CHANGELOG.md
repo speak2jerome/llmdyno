@@ -9,6 +9,23 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **Python library**: `import llmdyno` gives the whole app as an API: `cloud_model()` and `local_model()` (download or
+  register GGUF files), `bench()` with a preflight that raises `PreflightError` before anything starts, `Results`
+  with `leaderboard()`, `runs()`, `to_pandas()`, `to_csv()`, `to_json()` and `open()`, plus `setup()`, `doctor()`,
+  SWE-bench and polyglot imports, LLM-judge `review()` and `serve()`. Long operations print progress and Ctrl+C cancels
+  them cleanly. It uses the same data folder as the app, so plans run from Python show up in the dashboard.
+  `import llmdyno` stays instant: the API loads on first use. Guide: docs/LIBRARY.md; examples in examples/.
+- The release workflow can publish to PyPI (trusted publishing), switched on with the `PUBLISH_PYPI` repository
+  variable.
+
+### Fixed
+
+- `CITATION.cff` and the bug-report template said 0.3.0 in the 0.2.0 release: the version test bumped the real files
+  instead of its temporary copies. The test now redirects every file the bump script writes and fails if it touches
+  the repository.
+
 ## [0.2.0] - 2026-11-21
 
 ### Added
