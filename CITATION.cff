@@ -12,8 +12,8 @@ authors:
 repository-code: "https://github.com/speak2jerome/llmdyno"
 url: "https://github.com/speak2jerome/llmdyno"
 license: MIT
-version: 0.2.0
-date-released: "2026-11-21"
+version: 0.3.0
+date-released: "2026-11-22"
 keywords:
   - large language models
   - LLM benchmark
