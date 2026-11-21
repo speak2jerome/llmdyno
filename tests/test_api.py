@@ -57,6 +57,17 @@ def test_pages_work_without_docker_installed(client, monkeypatch):
     assert envs.image_present("swebench/sweb.eval.x86_64.x:latest") is False
 
 
+def test_specs_survive_cpu_frequency_errors(monkeypatch):
+    """psutil.cpu_freq() raises on some Apple Silicon Macs and VMs ("'pmgr' entry was not found")."""
+    from llmdyno.system import specs
+
+    def broken():
+        raise FileNotFoundError("'pmgr' entry was not found in AppleARMIODevice service")
+    monkeypatch.setattr(specs.psutil, "cpu_freq", broken)
+    cpu = specs.cpu_info()
+    assert cpu["max_mhz"] is None and cpu["threads"]
+
+
 def test_unknown_things_are_404(client):
     assert client.get("/api/plans/plan_missing").status_code == 404
     assert client.get("/api/runs/run_missing").status_code == 404

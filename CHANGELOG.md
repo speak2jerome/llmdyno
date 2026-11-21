@@ -53,6 +53,8 @@ than modified. Patch releases (0.1.1) only fix bugs.
 - Setup spots Docker Desktop on Windows stuck at start-up ("The file cannot be accessed by the system") because a
   crash left socket files behind, and offers a one-click fix that moves them aside. "Reset to factory defaults",
   which Docker suggests, would delete every image.
+- Setup loads on Apple Silicon Macs where macOS does not report the CPU frequency (psutil raised "'pmgr' entry
+  was not found"), as seen on GitHub's macOS runners.
 - Setup, Harnesses and the import dialog load on machines without Docker installed; before, the missing `docker`
   command crashed them.
 - Leaderboard bars add up to the final score when a configuration has no code-quality score (before, they were

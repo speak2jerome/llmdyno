@@ -118,7 +118,10 @@ def cpu_info():
                 flags = set(fm.group(1).split()) & {"avx", "avx2", "avx512f", "avx512_bf16", "avx_vnni", "fma"} if fm else set()
         except OSError:
             pass
-    freq = psutil.cpu_freq()
+    try:
+        freq = psutil.cpu_freq()
+    except (OSError, RuntimeError, NotImplementedError):  # Apple Silicon: "'pmgr' entry was not found" (VMs,
+        freq = None                                        # some macOS releases); frequency is cosmetic here
     return {"name": name or "Unknown CPU", "isa": "arm64" if arm else "x64", "cores": psutil.cpu_count(logical=False),
             "threads": psutil.cpu_count(), "max_mhz": round(freq.max) if freq and freq.max else None,
             "avx2": "avx2" in flags, "avx512": "avx512f" in flags, "neon": "neon" in flags,
