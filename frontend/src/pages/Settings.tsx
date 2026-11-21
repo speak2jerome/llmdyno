@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Monitor, Moon, Save, Sparkles, Sun, Trash2, Wand2 } from "lucide-react";
+import { BarChart3, ExternalLink, KeyRound, Monitor, Moon, RefreshCw, Save, Sparkles, Sun, Trash2, Wand2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { keys, useSample, useSettings } from "../queries";
+import { fmtAgo } from "../format";
+import { keys, useAA, useSample, useSettings } from "../queries";
 import { useTheme } from "../theme";
 import { Dyno, type DynoState } from "../dyno";
 import { Badge, Button, Card, Field, Input, KV, Notice, NumInput, PageHead, Segmented, Skeleton, useConfirm, useToast } from "../ui";
@@ -72,6 +73,7 @@ export default function Settings({ onOnboard }: { onOnboard: () => void }) {
             </div>
             {s.hf_token_set && <Badge tone="ok" className="mt-12">token saved</Badge>}
           </Card>
+          <AACard />
           <Card title={<span className="row"><Sparkles size={15} /> Sample results</span>} sub="The bundled round-1 study: 15 profiles × 5 tasks on an RTX 5080, Pi harness, two judges.">
             {sample.data?.loaded ? (
               <div className="row"><Badge tone="ok">loaded</Badge><Button variant="danger" size="sm" onClick={async () => {
@@ -87,6 +89,59 @@ export default function Settings({ onOnboard }: { onOnboard: () => void }) {
       </div>
       <AboutDyno />
     </div>
+  );
+}
+
+/** Artificial Analysis free API key: public reference numbers shown next to your results. */
+function AACard() {
+  const aa = useAA();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const st = aa.data;
+  const refresh = async (force = false) => {
+    setBusy(true);
+    try {
+      const r = await api.post("/references/aa/refresh", { force });
+      qc.invalidateQueries({ queryKey: keys.aa });
+      toast.ok(`Fetched ${r.models} models`, "Results now show the matching public numbers.");
+    } catch (e) {
+      toast.err("Could not fetch", e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card title={<span className="row"><BarChart3 size={15} /> Artificial Analysis reference</span>}
+      sub={<>Public intelligence index, price and speed for each profile's model, shown beside your results. Uses the free API
+        (100 requests a day); get a key at <a href="https://artificialanalysis.ai" target="_blank" rel="noreferrer">artificialanalysis.ai <ExternalLink size={11} /></a>.</>}>
+      <div className="row">
+        <Input type="password" autoComplete="off" aria-label="Artificial Analysis API key" value={key} onChange={(e) => setKey(e.target.value)}
+          placeholder={st?.has_key ? "A key is saved; paste to replace" : "API key"} />
+        <Button disabled={!key.trim()} onClick={async () => {
+          try {
+            await api.put("/settings/aa-key", { key: key.trim() });
+            setKey("");
+            qc.invalidateQueries({ queryKey: keys.aa });
+            toast.ok("Key saved");
+          } catch (e) {
+            toast.err("Could not save", e);
+          }
+        }}>Save</Button>
+        {st?.has_key && <Button variant="danger" iconOnly icon={<Trash2 size={14} />} aria-label="Remove key" onClick={async () => {
+          await api.del("/settings/aa-key");
+          qc.invalidateQueries({ queryKey: keys.aa });
+          toast.ok("Key removed");
+        }} />}
+      </div>
+      {st?.has_key && (
+        <div className="row between mt-12 small">
+          <span className="muted">{st.models ? `${st.models} models, fetched ${fmtAgo(st.fetched_at)}` : "Nothing fetched yet"} · {st.requests_today}/{st.daily_limit} requests today</span>
+          <Button size="sm" icon={<RefreshCw size={13} />} loading={busy} onClick={() => refresh(!!st.models)}>{st.models ? "Refresh" : "Fetch now"}</Button>
+        </div>
+      )}
+    </Card>
   );
 }
 

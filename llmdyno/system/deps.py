@@ -2,6 +2,7 @@
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from .. import config, secrets
@@ -10,7 +11,14 @@ from ..inference import llamacpp
 from . import specs as sysspecs
 
 IS_WIN = os.name == "nt"
-DOCKER_DESKTOP = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Docker" / "Docker" / "Docker Desktop.exe"
+IS_MAC = sysspecs.IS_MAC
+DOCKER_DESKTOP = (Path("/Applications/Docker.app") if IS_MAC else
+                  Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Docker" / "Docker" / "Docker Desktop.exe")
+# folders where Docker Desktop keeps only runtime sockets (recreated on every start)
+DOCKER_SOCKET_DIRS = [Path(os.environ.get("LOCALAPPDATA", "")) / "Docker" / "run",
+                      Path(os.environ.get("LOCALAPPDATA", "")) / "docker-secrets-engine"]
+DOCKER_MEMORY_HELP = ("https://docs.docker.com/desktop/settings-and-maintenance/settings/#resources" if IS_MAC else
+                      "https://learn.microsoft.com/windows/wsl/wsl-config#wslconfig")
 
 
 def _dep(id_, name, level, ok, detail, actions=None, why="", group="core"):
@@ -24,28 +32,64 @@ def check(force=False):
     out = []
     if d.get("installed"):
         acts = []
-        if not d.get("running") and IS_WIN and DOCKER_DESKTOP.exists():
+        stale = [] if d.get("running") else stale_docker_sockets()
+        if stale:
+            acts.append({"id": "repair_docker", "label": "Fix Docker Desktop start-up", "kind": "run",
+                         "confirm": "Docker Desktop left socket files behind after a crash and now stops at start-up "
+                                    "(\"The file cannot be accessed by the system\"). This quits Docker Desktop, moves "
+                                    "the folders holding them aside (they only hold sockets, recreated on every start) "
+                                    "and starts Docker again. Images, containers and volumes are not touched."})
+        if not d.get("running") and (IS_WIN or IS_MAC) and DOCKER_DESKTOP.exists():
             acts.append({"id": "start_docker", "label": "Start Docker Desktop", "kind": "run"})
-        out.append(_dep("docker", "Docker", "required", d.get("running"),
-                        f"Docker {d.get('server_version') or d.get('client_version')} · {d.get('engine_os', '')}".strip(" ·")
-                        if d.get("running") else f"Installed but not running: {d.get('error') or 'daemon unreachable'}",
-                        acts, "Agents and graders run in offline Docker sandboxes."))
+        detail = (f"Docker {d.get('server_version') or d.get('client_version')} · {d.get('engine_os', '')}".strip(" ·")
+                  if d.get("running") else f"Installed but not running: {d.get('error') or 'daemon unreachable'}")
+        if stale:
+            detail = ("Docker Desktop cannot start: socket files left by a crash block it "
+                      f"({', '.join(stale)}). Use Fix Docker Desktop start-up, and avoid 'Reset to factory defaults', "
+                      "which deletes your images.")
+        out.append(_dep("docker", "Docker", "required", d.get("running"), detail, acts,
+                        "Agents and graders run in offline Docker sandboxes."))
     else:
-        acts = ([{"id": "install_docker", "label": "Install Docker Desktop (winget)", "kind": "job",
-                  "note": "Runs: winget install -e --id Docker.DockerDesktop. Windows asks for administrator approval, "
-                          "and you accept Docker's subscription terms by installing it."}] if IS_WIN else
-                [{"id": "copy", "label": "Copy install command", "kind": "copy",
-                  "text": "curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $USER"}])
+        if IS_WIN:
+            acts = [{"id": "install_docker", "label": "Install Docker Desktop (winget)", "kind": "job",
+                     "note": "Runs: winget install -e --id Docker.DockerDesktop. Windows asks for administrator approval, "
+                             "and you accept Docker's subscription terms by installing it."}]
+        elif IS_MAC:
+            acts = [{"id": "copy", "label": "Copy Homebrew command", "kind": "copy", "text": "brew install --cask docker"}]
+        else:
+            acts = [{"id": "copy", "label": "Copy install command", "kind": "copy",
+                     "text": "curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $USER"}]
         acts.append({"id": "link", "label": "Docker download page", "kind": "link", "url": "https://docs.docker.com/get-docker/"})
         out.append(_dep("docker", "Docker", "required", False, "Not installed", acts,
                         "Agents and graders run in offline Docker sandboxes."))
     if d.get("running") and d.get("mem_total_bytes"):
         gb = d["mem_total_bytes"] / 2**30
         out.append(_dep("docker_memory", "Docker memory", "recommended", gb >= 8, f"{gb:.0f} GB available to containers",
-                        [{"id": "link", "label": "How to raise the WSL 2 limit", "kind": "link",
-                          "url": "https://learn.microsoft.com/windows/wsl/wsl-config#wslconfig"}] if IS_WIN and gb < 8 else [],
+                        [{"id": "link", "label": "How to raise the Docker Desktop limit" if IS_MAC else
+                          "How to raise the WSL 2 limit", "kind": "link", "url": DOCKER_MEMORY_HELP}]
+                        if (IS_WIN or IS_MAC) and gb < 8 else [],
                         "Agent sandboxes get up to 12 GB and graders 8 GB; below 8 GB large tasks can be killed."))
+    if d.get("running") and d.get("arch") == "arm64":
+        out.append(_dep("docker_arch", "Docker on ARM64", "optional", True,
+                        f"Native {d.get('os_arch')} images. SWE-bench task images are x86-64 only and run under emulation.",
+                        [{"id": "link", "label": "Rosetta emulation in Docker Desktop", "kind": "link",
+                          "url": "https://docs.docker.com/desktop/settings-and-maintenance/settings/#general"}] if IS_MAC else
+                        [{"id": "copy", "label": "Copy QEMU setup command", "kind": "copy",
+                          "text": "docker run --privileged --rm tonistiigi/binfmt --install amd64"}],
+                        "The sandbox and harness images build natively for ARM64. Turn on x86-64 emulation (Rosetta on "
+                        "Apple Silicon, QEMU binfmt on Linux) only if you plan to run SWE-bench tasks."))
     g = sysspecs.primary_gpu(s)
+    if g and g.get("vendor") == "Apple":
+        lim = g.get("vram_total_mib") or 0
+        ram = g.get("ram_total_mib") or 0
+        suggest = max(lim, int(ram - 8192)) if ram else lim
+        out.append(_dep("gpu_memory_limit", "GPU memory limit", "optional", True,
+                        f"Metal can use {lim / 1024:.0f} of {ram / 1024:.0f} GB unified memory"
+                        + (" (raised with iogpu.wired_limit_mb)" if g.get("wired_limit_set") else " (macOS default)"),
+                        [{"id": "copy", "label": "Copy command to raise it", "kind": "copy",
+                          "text": f"sudo sysctl iogpu.wired_limit_mb={suggest}"}] if ram and suggest > lim + 1024 else [],
+                        "macOS reserves part of unified memory for the system. Raising the limit lets larger models stay on "
+                        "the GPU; it resets on reboot. Leave at least 8 GB for macOS and Docker.", group="local"))
     if g and g["vendor"] == "NVIDIA":
         try:
             major = int(str(g.get("driver", "0")).split(".")[0])
@@ -90,6 +134,7 @@ def check(force=False):
                     f"{free / 2**30:.0f} GB free at {models_dir}",
                     [{"id": "open_settings", "label": "Change folders", "kind": "nav", "to": "/settings"}],
                     "Quantized models are 4-30 GB each; keep at least 30 GB free.", group="local"))
+    out += external_deps(d)
     has_hf = secrets.has("hf_token")
     out.append(_dep("hf_token", "Hugging Face token", "optional", has_hf,
                     "Set" if has_hf else "Not set (only needed for gated models)",
@@ -98,10 +143,81 @@ def check(force=False):
     return out
 
 
+def external_deps(d):
+    """SWE-bench and Aider polyglot: only needed once their tasks are imported (Benchmarks > Import)."""
+    from ..benchmarks import polyglot, swebench
+    out = []
+    sw = swebench.harness_status()
+    want = (config.get("swebench") or {}).get("harness_version")
+    out.append(_dep("swebench_harness", "SWE-bench harness", "for SWE-bench tasks", sw["installed"],
+                    f"swebench {sw['version']} in its own venv" + ("" if sw["version"] == want else f" (LLMDyno expects {want})")
+                    if sw["installed"] else f"Not installed (swebench {want} from PyPI, about 250 MB, in an isolated venv)",
+                    [{"id": "install_swebench", "label": "Reinstall" if sw["installed"] else "Install", "kind": "job"},
+                     {"id": "open_import", "label": "Import tasks", "kind": "nav", "to": "/benchmarks?import=swebench"}],
+                    "SWE-bench tasks are graded by the official harness, exactly as on the public leaderboard.",
+                    group="benchmarks"))
+    img = images.image_exists(polyglot.IMAGE)
+    ready = polyglot.context_ready()
+    out.append(_dep("polyglot_image", "Polyglot toolchains", "for Aider polyglot tasks", bool(img),
+                    f"{polyglot.IMAGE} · {img['size_bytes'] / 2**30:.1f} GB" if img else
+                    ("Not built (about 4 GB: Go, Rust, JDK 21 + Gradle, CMake, jest)" if ready else
+                     "Import the polyglot benchmark first; the image is built from its exercises"),
+                    ([{"id": "build_polyglot", "label": "Build image", "kind": "job"}] if ready and d.get("running") else [])
+                    + [{"id": "open_import", "label": "Import tasks", "kind": "nav", "to": "/benchmarks?import=polyglot"}],
+                    "C++, Go, Java, JavaScript and Rust exercises need their compilers and test runners offline.",
+                    group="benchmarks"))
+    return out
+
+
+def _stale_in(folder):
+    out = []
+    try:
+        entries = list(folder.iterdir())
+    except OSError:
+        return out
+    for f in entries:
+        try:
+            os.stat(f)
+        except OSError as e:
+            if getattr(e, "winerror", None) == 1920:
+                out.append(f.name)
+    return out
+
+
+def stale_docker_sockets():
+    """Windows only: AF_UNIX socket files that Docker Desktop left behind after a crash (in %LOCALAPPDATA%\\Docker\\run
+    and %LOCALAPPDATA%\\docker-secrets-engine). Windows cannot open or delete them (error 1920), so Docker Desktop
+    fails on its next start while trying to remove them. Only meaningful while Docker is not running."""
+    if not IS_WIN:
+        return []
+    return [f"{d.name}\\{n}" for d in DOCKER_SOCKET_DIRS if d.is_dir() for n in _stale_in(d)]
+
+
+def repair_docker_start():
+    """Quit Docker Desktop, move its runtime socket folder aside (it is recreated on start) and start it again."""
+    if not IS_WIN:
+        raise RuntimeError("this repair is only needed on Windows")
+    for exe in ("Docker Desktop.exe", "com.docker.backend.exe", "com.docker.build.exe"):
+        subprocess.run(["taskkill", "/F", "/IM", exe], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    time.sleep(3)
+    moved = []
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    for d in DOCKER_SOCKET_DIRS:
+        if d.is_dir() and _stale_in(d):
+            dest = d.with_name(f"{d.name}.stale-{stamp}")
+            d.rename(dest)
+            moved.append(str(dest))
+    start_docker_desktop()
+    return moved
+
+
 def start_docker_desktop():
-    if not (IS_WIN and DOCKER_DESKTOP.exists()):
+    if not ((IS_WIN or IS_MAC) and DOCKER_DESKTOP.exists()):
         raise RuntimeError("Docker Desktop was not found")
-    subprocess.Popen([str(DOCKER_DESKTOP)], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW)
+    if IS_MAC:
+        subprocess.Popen(["open", "-a", "Docker"])
+    else:
+        subprocess.Popen([str(DOCKER_DESKTOP)], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW)
 
 
 def install_docker(ctx):

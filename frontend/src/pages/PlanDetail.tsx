@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BarChart3, Gavel, Pause, Pencil, Play, RotateCcw, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, FileDown, Gavel, Pause, Pencil, Play, RotateCcw, Square, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { LogoName, profileLogo } from "../logos";
-import { api } from "../api";
+import { api, download } from "../api";
 import { Chart, axis } from "../charts";
 import { JobPanel } from "../components";
 import { plural, fmtDur, fmtMib, fmtNum, fmtTokens, fmtUsd, scoreColor } from "../format";
@@ -100,6 +100,10 @@ export default function PlanDetail() {
           {!live && ((counts.failed || 0) + (counts.cancelled || 0)) > 0 && <Button icon={<RotateCcw size={14} />} onClick={() => act("retry", "Retrying failed and cancelled runs")}>{counts.failed && counts.cancelled ? "Retry failed & cancelled" : counts.failed ? "Retry failed" : "Retry cancelled"} ({(counts.failed || 0) + (counts.cancelled || 0)})</Button>}
           <Button icon={<Gavel size={14} />} onClick={() => nav(`/judging?plan=${id}`)} disabled={!counts.done}>Judge</Button>
           <Button icon={<BarChart3 size={14} />} onClick={() => nav(`/results?plans=${id}`)} disabled={!counts.done}>Results</Button>
+          {plan.benchmark_ids.some((b: string) => b.startsWith("swe_")) && (
+            <Button icon={<FileDown size={14} />} disabled={!counts.done} title="Patches in the SWE-bench predictions format (JSONL), one model name per profile and harness"
+              onClick={() => download(`/plans/${id}/swebench-predictions`)}>SWE-bench predictions</Button>
+          )}
           {!live && <Button variant="ghost" iconOnly icon={<Trash2 size={14} />} aria-label="Delete plan" onClick={async () => {
             if (!(await confirm({ title: `Delete ${plan.name}?`, body: "Runs, workspaces, transcripts and reviews are removed permanently.", danger: true, confirm: "Delete plan" })).ok) return;
             api.del(`/plans/${id}`).then(() => { qc.invalidateQueries({ queryKey: keys.plans }); nav("/plans"); }).catch((e) => toast.err("Could not delete", e));

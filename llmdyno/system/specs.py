@@ -1,4 +1,4 @@
-"""Hardware and software detection for x86-64 Windows and Linux.
+"""Hardware and software detection for Windows, Linux and macOS on x86-64 and ARM64 (including Apple Silicon).
 
 Everything here is best effort: a missing tool yields None plus a note instead of an exception."""
 import ctypes
@@ -14,9 +14,23 @@ from pathlib import Path
 import psutil
 
 from .. import config
+from . import apple
 
-SUPPORTED_ARCH = {"amd64", "x86_64", "x64"}
+ARCH_ALIASES = {"amd64": "x64", "x86_64": "x64", "x64": "x64", "arm64": "arm64", "aarch64": "arm64", "armv8": "arm64",
+                "armv8l": "arm64", "arm64e": "arm64"}
 IS_WIN = os.name == "nt"
+IS_MAC = platform.system() == "Darwin"
+IS_LINUX = platform.system() == "Linux"
+
+
+def norm_arch(machine=None):
+    """'x64' or 'arm64' (the two LLMDyno supports), or the raw machine string for anything else."""
+    m = (machine or platform.machine()).lower()
+    return ARCH_ALIASES.get(m, m)
+
+
+def os_family():
+    return "windows" if IS_WIN else "macos" if IS_MAC else "linux"
 
 # Peak memory bandwidth (GB/s) for common GPUs, used only for a rough decode-speed estimate.
 GPU_BANDWIDTH = {
@@ -29,7 +43,11 @@ GPU_BANDWIDTH = {
     "rx 9070 xt": 640, "rx 9070": 640, "rx 7900 xtx": 960, "rx 7900 xt": 800, "rx 7800 xt": 624, "rx 7600": 288,
     "arc b580": 456, "arc a770": 560,
 }
-CPU_FEATURES = {"avx": 39, "avx2": 40, "avx512f": 41}   # Windows IsProcessorFeaturePresent ids
+CPU_FEATURES = {"avx": 39, "avx2": 40, "avx512f": 41}   # Windows IsProcessorFeaturePresent ids (x64)
+ARM_FEATURES = {"dotprod": 43, "sve": 46, "sve2": 47}      # PF_ARM_V82_DP, PF_ARM_SVE, PF_ARM_SVE2 (Windows on ARM)
+# Linux /proc/cpuinfo "Features" names -> the flags llama.cpp cares about on ARM
+LINUX_ARM_FLAGS = {"asimd": "neon", "asimddp": "dotprod", "i8mm": "i8mm", "sve": "sve", "sve2": "sve2", "bf16": "bf16",
+                   "fphp": "fp16", "asimdhp": "fp16", "sme": "sme"}
 
 
 def run(args, timeout=15):
@@ -42,12 +60,14 @@ def run(args, timeout=15):
 
 
 def os_info():
-    arch = platform.machine().lower()
-    info = {"system": platform.system(), "release": platform.release(), "version": platform.version(),
-            "arch": arch, "arch_supported": arch in SUPPORTED_ARCH, "python": platform.python_version(),
-            "hostname": platform.node()}
+    arch = norm_arch()
+    info = {"system": platform.system(), "family": os_family(), "release": platform.release(),
+            "version": platform.version(), "arch": arch, "machine": platform.machine(),
+            "arch_supported": arch in ("x64", "arm64"), "python": platform.python_version(), "hostname": platform.node()}
     if IS_WIN:
         info["pretty"] = f"Windows {platform.release()} (build {platform.version().split('.')[-1]})"
+    elif IS_MAC:
+        info["pretty"] = f"macOS {platform.mac_ver()[0] or platform.release()}"
     else:
         try:
             rel = dict(line.split("=", 1) for line in Path("/etc/os-release").read_text().splitlines() if "=" in line)
@@ -57,9 +77,20 @@ def os_info():
     return info
 
 
+def arm_flags_linux(cpuinfo_text):
+    fm = re.search(r"^Features\s*:\s*(.+)$", cpuinfo_text, re.M)
+    return {LINUX_ARM_FLAGS[f] for f in (fm.group(1).split() if fm else []) if f in LINUX_ARM_FLAGS}
+
+
 def cpu_info():
     name, flags = platform.processor(), set()
-    if IS_WIN:
+    arm = norm_arch() == "arm64"
+    extra = {}
+    if IS_MAC:
+        c = apple.cpu_from_sysctl(apple.sysctl(run))
+        name, flags = c["name"], c["flags"]
+        extra = {"performance_cores": c["performance_cores"], "efficiency_cores": c["efficiency_cores"]}
+    elif IS_WIN:
         try:
             import winreg
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as k:
@@ -68,7 +99,10 @@ def cpu_info():
             pass
         try:
             k32 = ctypes.windll.kernel32
-            flags = {f for f, pid in CPU_FEATURES.items() if k32.IsProcessorFeaturePresent(pid)}
+            table = ARM_FEATURES if arm else CPU_FEATURES
+            flags = {f for f, pid in table.items() if k32.IsProcessorFeaturePresent(pid)}
+            if arm:
+                flags.add("neon")           # Advanced SIMD is mandatory on ARMv8
         except (AttributeError, OSError):
             pass
     else:
@@ -76,14 +110,37 @@ def cpu_info():
             text = Path("/proc/cpuinfo").read_text()
             m = re.search(r"model name\s*:\s*(.+)", text)
             name = m.group(1).strip() if m else name
-            fm = re.search(r"^flags\s*:\s*(.+)$", text, re.M)
-            flags = set(fm.group(1).split()) & {"avx", "avx2", "avx512f", "avx512_bf16", "avx_vnni", "fma"} if fm else set()
+            if arm:
+                flags = arm_flags_linux(text)
+                name = _linux_arm_name() or name
+            else:
+                fm = re.search(r"^flags\s*:\s*(.+)$", text, re.M)
+                flags = set(fm.group(1).split()) & {"avx", "avx2", "avx512f", "avx512_bf16", "avx_vnni", "fma"} if fm else set()
         except OSError:
             pass
     freq = psutil.cpu_freq()
-    return {"name": name or "Unknown CPU", "cores": psutil.cpu_count(logical=False), "threads": psutil.cpu_count(),
-            "max_mhz": round(freq.max) if freq and freq.max else None, "avx2": "avx2" in flags,
-            "avx512": "avx512f" in flags, "flags": sorted(flags)}
+    return {"name": name or "Unknown CPU", "isa": "arm64" if arm else "x64", "cores": psutil.cpu_count(logical=False),
+            "threads": psutil.cpu_count(), "max_mhz": round(freq.max) if freq and freq.max else None,
+            "avx2": "avx2" in flags, "avx512": "avx512f" in flags, "neon": "neon" in flags,
+            "dotprod": "dotprod" in flags, "i8mm": "i8mm" in flags, "sve": "sve" in flags,
+            # the SIMD level llama.cpp needs for usable CPU speed: AVX2 on x86-64, NEON with dot product on ARM
+            "simd_ok": ("neon" in flags and "dotprod" in flags) if arm else "avx2" in flags,
+            "flags": sorted(flags), **extra}
+
+
+def _linux_arm_name():
+    """ARM boards rarely fill "model name"; lscpu or the device tree usually know better."""
+    if shutil.which("lscpu"):
+        code, out, _ = run(["lscpu"])
+        m = re.search(r"Model name:\s*(.+)", out) if code == 0 else None
+        if m and m.group(1).strip() not in ("-", ""):
+            vendor = re.search(r"Vendor ID:\s*(.+)", out)
+            v = vendor.group(1).strip() if vendor else ""
+            return (f"{v} " if v and v not in m.group(1) else "") + m.group(1).strip()
+    try:
+        return Path("/sys/firmware/devicetree/base/model").read_text().strip("\x00\n ")
+    except OSError:
+        return None
 
 
 def memory_info():
@@ -127,7 +184,14 @@ def nvidia_gpus():
 
 
 def gpu_usage():
-    """Fast VRAM reading for live meters (one nvidia-smi query, no full system scan)."""
+    """Fast GPU memory reading for live meters (one nvidia-smi or ioreg query, no full system scan)."""
+    if IS_MAC:
+        st = apple.gpu_stats(run)
+        g = next((x for x in detect()["gpus"] if x.get("unified")), None)
+        if not g or st.get("in_use_bytes") is None:
+            return []
+        return [{"index": 0, "name": g["name"], "vram_used_mib": round(st["in_use_bytes"] / 2**20),
+                 "vram_total_mib": g["vram_total_mib"], "util_pct": st.get("util_pct"), "power_w": None}]
     exe = shutil.which("nvidia-smi")
     if not exe:
         return []
@@ -169,7 +233,14 @@ def other_gpus_windows():
                             drv = ""
                 except OSError:
                     continue
-                vendor = "AMD" if re.search(r"amd|radeon", desc, re.I) else "Intel" if re.search(r"intel|arc", desc, re.I) else None
+                vendor = ("AMD" if re.search(r"amd|radeon", desc, re.I) else "Intel" if re.search(r"intel|arc", desc, re.I)
+                          else "Qualcomm" if re.search(r"qualcomm|adreno", desc, re.I) else None)
+                if vendor == "Qualcomm":
+                    # Snapdragon X: an integrated Adreno GPU sharing system RAM; llama.cpp ships an OpenCL Adreno build
+                    gpus.append({"vendor": vendor, "name": desc, "vram_total_mib": None, "vram_used_mib": None,
+                                 "vram_free_mib": None, "driver": drv, "integrated": True, "bandwidth_gbs": 135,
+                                 "backend": "opencl-adreno"})
+                    continue
                 if not vendor or not mem:
                     continue
                 integrated = mem <= 4 * 1024**3 and bool(re.search(r"graphics(?!.*(rx|arc))", desc, re.I))
@@ -257,6 +328,7 @@ def docker_info():
     server = v.get("Server") or {}
     info = {"installed": True, "client_version": client, "running": bool(server),
             "server_version": server.get("Version"), "os_arch": f"{server.get('Os')}/{server.get('Arch')}" if server else None,
+            "arch": norm_arch(server.get("Arch")) if server.get("Arch") else None,
             "error": None if server else (err.strip().splitlines() or ["daemon not reachable"])[-1][:300]}
     if server:
         code, out, _ = run([exe, "info", "--format", "{{.MemTotal}} {{.NCPU}} {{.OperatingSystem}}"], timeout=20)
@@ -275,10 +347,16 @@ _cache = {"t": 0.0, "data": None}
 def detect(force=False):
     if not force and _cache["data"] and time.time() - _cache["t"] < 20:
         return _cache["data"]
-    nv, cuda = nvidia_gpus()
-    others = other_gpus_windows() if IS_WIN else other_gpus_linux()
+    mem = memory_info()
+    if IS_MAC:
+        nv, cuda = [], None
+        ag = apple.apple_gpu(run, mem["total_bytes"])
+        others = [ag] if ag else []
+    else:
+        nv, cuda = nvidia_gpus()
+        others = other_gpus_windows() if IS_WIN else other_gpus_linux()
     gpus = nv + [g for g in others if g["vendor"] != "NVIDIA"]
-    data = {"os": os_info(), "cpu": cpu_info(), "memory": memory_info(), "gpus": gpus, "cuda_version": cuda,
+    data = {"os": os_info(), "cpu": cpu_info(), "memory": mem, "gpus": gpus, "cuda_version": cuda,
             "disks": disk_info(), "docker": docker_info(), "detected_at": time.time()}
     data["summary"] = summarize(data)
     _cache.update(t=time.time(), data=data)
@@ -286,8 +364,16 @@ def detect(force=False):
 
 
 def primary_gpu(specs):
+    """The GPU llama.cpp would run on: the biggest discrete (or Apple unified-memory) GPU. Integrated graphics only
+    count when nothing else exists and llama.cpp has a backend worth using for them (Snapdragon's Adreno)."""
     discrete = [g for g in specs["gpus"] if not g.get("integrated") and g.get("vram_total_mib")]
-    return max(discrete, key=lambda g: g["vram_total_mib"], default=None)
+    if discrete:
+        return max(discrete, key=lambda g: g["vram_total_mib"])
+    adreno = next((g for g in specs["gpus"] if g.get("backend") == "opencl-adreno"), None)
+    if adreno:
+        # shares system RAM; leave room for Windows like macOS does for its GPU
+        return {**adreno, "vram_total_mib": round(specs["memory"]["total_bytes"] / 2**20 * 0.6), "unified": True}
+    return None
 
 
 def summarize(s):
@@ -296,9 +382,23 @@ def summarize(s):
     ram_gb = s["memory"]["total_bytes"] / 2**30
     notes = []
     if not s["os"]["arch_supported"]:
-        notes.append({"level": "danger", "text": f"Architecture {s['os']['arch']} is not supported yet; LLMDyno "
-                      "targets x86-64 (ARM support is planned)."})
-    if g:
+        notes.append({"level": "danger", "text": f"Architecture {s['os']['arch']} is not supported; LLMDyno runs on "
+                      "x86-64 and ARM64 (including Apple Silicon)."})
+    if g and g.get("vendor") == "Apple":
+        lim = g["vram_total_mib"] / 1024
+        notes.append({"level": "info", "text": f"{g['chip']} with {ram_gb:.0f} GB unified memory: Metal lets the GPU use "
+                      f"about {lim:.0f} GB, so models up to about {max(lim - 3, 0):.0f} GB of weights fit with a 64k context."})
+        if not g.get("wired_limit_set"):
+            notes.append({"level": "info", "text": "To give the GPU more of the unified memory, run "
+                          f"sudo sysctl iogpu.wired_limit_mb={int(ram_gb * 1024 * 0.85)} (it resets at reboot; leave at "
+                          "least 8 GB for macOS)."})
+        notes.append({"level": "warning", "text": "If a model needs more than the GPU's share, macOS compresses and swaps "
+                      "memory instead of failing, and decoding slows to a crawl. LLMDyno refuses such profiles unless "
+                      "the plan allows it."})
+    elif g and g.get("backend") == "opencl-adreno":
+        notes.append({"level": "info", "text": f"{g['name']}: an integrated GPU sharing system RAM. llama.cpp's OpenCL "
+                      "Adreno build accelerates quantized models; the Vulkan and CPU builds also work."})
+    elif g:
         vram_gb = g["vram_total_mib"] / 1024
         budget = max(vram_gb - 2.5, 0)
         notes.append({"level": "info", "text": f"{g['name']} with {vram_gb:.0f} GB VRAM: models up to about "
@@ -313,10 +413,17 @@ def summarize(s):
     else:
         notes.append({"level": "warning", "text": "No discrete GPU found: local models would run on the CPU, which is "
                       "slow for agentic tasks with long contexts. Cloud providers work normally."})
-    if not s["cpu"]["avx2"]:
-        notes.append({"level": "warning", "text": "CPU without AVX2: CPU inference and offloaded layers will be very slow."})
-    notes.append({"level": "info", "text": f"{ram_gb:.0f} GB system RAM" + (
-        "; enough to offload some MoE experts to the CPU." if ram_gb >= 32 else "; little room for CPU offload.")})
+    if not s["cpu"].get("simd_ok", s["cpu"].get("avx2")):
+        missing = "NEON dot-product instructions" if s["cpu"].get("isa") == "arm64" else "AVX2"
+        notes.append({"level": "warning", "text": f"CPU without {missing}: CPU inference and offloaded layers will be very slow."})
+    if not (g and g.get("unified")):
+        notes.append({"level": "info", "text": f"{ram_gb:.0f} GB system RAM" + (
+            "; enough to offload some MoE experts to the CPU." if ram_gb >= 32 else "; little room for CPU offload.")})
+    d = s["docker"]
+    if d.get("running") and norm_arch(str(d.get("os_arch") or "").split("/")[-1]) == "arm64":
+        notes.append({"level": "info", "text": "Docker runs ARM64 Linux containers here, so the built-in benchmarks run "
+                      "natively. SWE-bench task images are x86-64 and run under emulation: in Docker Desktop, turn on "
+                      "'Use Rosetta for x86_64/amd64 emulation'."})
     if not s["docker"].get("running"):
         notes.append({"level": "danger", "text": "Docker is not running. Agents and graders run in Docker sandboxes, so "
                       "benchmarks cannot start until it is."})

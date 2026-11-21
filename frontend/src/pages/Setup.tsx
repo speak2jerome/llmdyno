@@ -22,6 +22,7 @@ export default function Setup() {
   const groups = [
     { id: "core", title: "Core", sub: "Needed for every benchmark" },
     { id: "local", title: "Local models", sub: "Needed only for models on this machine" },
+    { id: "benchmarks", title: "Public benchmarks", sub: "Needed only for imported SWE-bench and Aider polyglot tasks" },
   ];
   return (
     <div className="page">
@@ -51,7 +52,7 @@ export default function Setup() {
               <Table rowKey={(g: any) => g.name + (g.index ?? "")} rows={s.gpus} cols={[
                 { key: "name", label: "GPU", render: (g: any) => <b>{g.name}</b> },
                 { key: "vendor", label: "Vendor" },
-                { key: "vram", label: "VRAM", num: true, render: (g: any) => fmtMib(g.vram_total_mib, 0) },
+                { key: "vram", label: "VRAM", num: true, render: (g: any) => g.unified ? <span title="GPU share of unified memory">{fmtMib(g.vram_total_mib, 0)} <span className="muted">unified</span></span> : fmtMib(g.vram_total_mib, 0) },
                 { key: "free", label: "Free", num: true, render: (g: any) => g.vram_free_mib != null ? fmtMib(g.vram_free_mib) : "–" },
                 { key: "bw", label: "Bandwidth", num: true, render: (g: any) => g.bandwidth_gbs ? `${g.bandwidth_gbs} GB/s` : "–" },
                 { key: "backend", label: "Build", render: (g: any) => g.integrated ? <span className="muted">integrated</span> : g.backend.toUpperCase() },
@@ -60,10 +61,10 @@ export default function Setup() {
             <Card title="Software">
               <KV items={[
                 ["Operating system", s.os.pretty],
-                ["Architecture", `${s.os.arch}${s.os.arch_supported ? "" : " (not supported yet)"}`],
+                ["Architecture", `${s.os.arch === "arm64" ? "ARM64" : s.os.arch === "x64" ? "x86-64" : s.os.arch}${s.os.arch_supported ? "" : " (not supported)"}`],
                 ["Python", s.os.python],
                 ["CUDA (driver)", s.cuda_version || "–"],
-                ["Docker", s.docker.running ? `${s.docker.server_version} · ${s.docker.engine_os} · ${s.docker.ncpu} CPUs · ${fmtMib((s.docker.mem_total_bytes || 0) / 2 ** 20, 0)}` : s.docker.installed ? "installed, not running" : "not installed"],
+                ["Docker", s.docker.running ? `${s.docker.server_version} · ${s.docker.engine_os} · ${s.docker.os_arch} · ${s.docker.ncpu} CPUs · ${fmtMib((s.docker.mem_total_bytes || 0) / 2 ** 20, 0)}` : s.docker.installed ? "installed, not running" : "not installed"],
                 ["GPU in containers", s.docker.nvidia_runtime ? "NVIDIA runtime available" : "not needed (llama-server runs on the host)"],
               ]} />
             </Card>

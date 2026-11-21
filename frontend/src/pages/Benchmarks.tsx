@@ -1,19 +1,22 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, ArrowRight, CheckCircle2, Copy, Download, FileCode2, FileUp, FlaskConical, Layers3, Pencil, Plus, Save, ShieldCheck, Trash2, XCircle,
+  ArrowLeft, ArrowRight, CheckCircle2, Copy, Download, ExternalLink, FileCode2, FileUp, FlaskConical, Globe, Layers3, Pencil, Plus, Save,
+  ShieldCheck, Trash2, XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, download } from "../api";
 import { JobPanel } from "../components";
 import { fmtBytes, fmtMin } from "../format";
 import { keys, useBenchmarks, useJob, useSuites } from "../queries";
+import { ImportModal } from "./ImportBenchmarks";
 import {
   Badge, Button, Card, Checkbox, Chip, Drawer, Empty, Field, Input, KV, Markdown, Menu, Modal, Notice, NumInput, PageHead, Segmented,
   Select, Skeleton, Tabs, Textarea, useConfirm, useToast,
 } from "../ui";
 
 const DIFF_TONE: Record<string, string> = { easy: "ok", medium: "info", hard: "warn" };
+const PAGE = 60;
 
 export default function Benchmarks() {
   const [tab, setTab] = useState<"benchmarks" | "suites">("benchmarks");
@@ -27,6 +30,9 @@ export default function Benchmarks() {
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<string | null>(null);
   const [suiteEdit, setSuiteEdit] = useState<any>(null);
+  const [params, setParams] = useSearchParams();
+  const importKind = params.get("import") as "swebench" | "polyglot" | null;
+  const [limit, setLimit] = useState(PAGE);
   const list = benchmarks.data || [];
   const cats = ["all", ...Array.from(new Set(list.map((b) => b.category)))];
   const shown = list.filter((b) => (cat === "all" || b.category === cat) && (!q || `${b.title} ${b.summary} ${(b.tags || []).join(" ")}`.toLowerCase().includes(q.toLowerCase())));
@@ -44,6 +50,7 @@ export default function Benchmarks() {
       <PageHead title="Benchmarks" sub="Tasks with hidden graders: tests are copied in only after the agent finishes. Group them into suites for plans."
         actions={<>
           <input ref={file} type="file" accept=".zip" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+          <Button icon={<Globe size={15} />} onClick={() => setParams({ import: "swebench" })}>Import SWE-bench / polyglot</Button>
           <Button icon={<FileUp size={15} />} onClick={() => file.current?.click()}>Import zip</Button>
           <Button icon={<Layers3 size={15} />} onClick={() => { setTab("suites"); setSuiteEdit({}); }}>New suite</Button>
           <Button variant="primary" icon={<Plus size={15} />} onClick={() => nav("/benchmarks/new")}>Create benchmark</Button>
@@ -52,13 +59,13 @@ export default function Benchmarks() {
       {tab === "benchmarks" && (
         <>
           <div className="row wrap mb-16">
-            {cats.map((c) => <Chip key={c} on={cat === c} onClick={() => setCat(c)}>{c === "all" ? "All" : c}</Chip>)}
+            {cats.map((c) => <Chip key={c} on={cat === c} onClick={() => { setCat(c); setLimit(PAGE); }}>{c === "all" ? "All" : c}</Chip>)}
             <span className="spacer" />
             <Input style={{ maxWidth: 260 }} placeholder="Search benchmarks" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search benchmarks" />
           </div>
           {benchmarks.isLoading ? <Skeleton h={200} /> : shown.length ? (
             <div className="grid grid-auto" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))" }}>
-              {shown.map((b) => (
+              {shown.slice(0, limit).map((b) => (
                 <Card key={b.id} onClick={() => setDetail(b.id)}>
                   <div className="row between"><Badge tone="accent">{b.category}</Badge><Badge tone={DIFF_TONE[b.difficulty]}>{b.difficulty}</Badge></div>
                   <h3 className="mt-12">{b.title}</h3>
@@ -68,17 +75,24 @@ export default function Benchmarks() {
                     <Badge title="Context needed in reference runs">~{Math.round((b.min_context || 0) / 1000)}k ctx</Badge>
                     <Badge title="Typical local run time">~{fmtMin(b.expected_minutes?.local)}</Badge>
                     {(b.languages || []).map((l: string) => <Badge key={l} tone="outline">{l}</Badge>)}
-                    {!b.builtin && <Badge tone="info">custom</Badge>}
+                    {b.env ? <Badge tone="info" title={b.env.image}>own image</Badge> : !b.builtin && <Badge tone="info">custom</Badge>}
                   </div>
                 </Card>
               ))}
             </div>
           ) : <Card><Empty icon={<FlaskConical size={22} />} title="No benchmarks match">Clear the filter or create your own.</Empty></Card>}
+          {shown.length > limit && (
+            <div className="row mt-16" style={{ justifyContent: "center" }}>
+              <Button onClick={() => setLimit((n) => n + PAGE * 4)}>Show more ({shown.length - limit} hidden)</Button>
+              <span className="muted small">Search or pick a category to narrow the list.</span>
+            </div>
+          )}
         </>
       )}
       {tab === "suites" && <Suites suites={suites.data || []} benchmarks={list} onEdit={setSuiteEdit} />}
       {detail && <BenchmarkDrawer id={detail} onClose={() => setDetail(null)} />}
       {suiteEdit && <SuiteModal suite={suiteEdit} benchmarks={list} onClose={() => setSuiteEdit(null)} />}
+      {importKind && <ImportModal initial={importKind === "polyglot" ? "polyglot" : "swebench"} onClose={() => setParams({})} />}
     </div>
   );
 }
@@ -177,7 +191,7 @@ function BenchmarkDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   };
   const report = job?.status === "done" ? job.result : null;
   return (
-    <Drawer open onClose={onClose} wide title={b?.title || "Benchmark"} sub={b ? `${b.category} · ${b.difficulty} · ${b.n_stages} stage(s) · ${b.builtin ? "built-in" : "custom"}${b.origin ? ` · ${b.origin}` : ""}` : ""}
+    <Drawer open onClose={onClose} wide title={b?.title || "Benchmark"} sub={b ? `${b.category} · ${b.difficulty} · ${b.n_stages} stage(s) · ${b.builtin ? "built-in" : b.source ? "imported" : "custom"}${b.origin ? ` · ${b.origin}` : ""}` : ""}
       footer={b && <>
         <Menu align="left" trigger={(o) => <Button onClick={o}>More</Button>} items={[
           { label: "Export as zip", icon: <Download size={14} />, onClick: () => download(`/benchmarks/${id}/export`) },
@@ -217,19 +231,25 @@ function BenchmarkDrawer({ id, onClose }: { id: string; onClose: () => void }) {
           )}
           {tab === "files" && (
             <div className="col" style={{ gap: 14 }}>
-              <FileList title="Starting workspace" files={b.workspace_files} empty="Empty folder: the agent builds from scratch." />
+              <FileList title="Starting workspace" files={b.workspace_files}
+                empty={b.env?.workspace === "volume" ? `The repository inside ${b.env.image}, at ${b.env.repo_dir} (checked out at ${String(b.env.base_commit || "").slice(0, 10)}).` : "Empty folder: the agent builds from scratch."} />
               {b.stage_files.length > 0 && <FileList title="Files added at later stages" files={b.stage_files} />}
               <FileList title="Reference solution (used only for validation)" files={b.reference_files} empty="No reference solution." />
             </div>
           )}
           {tab === "grading" && (
             <div className="col" style={{ gap: 14 }}>
-              <KV items={[["Grader", b.grader.type === "spec" ? "hidden pytest files + checks" : `script ${b.grader.path}`], ["Grader timeout", `${Math.round(b.grader.timeout_s / 60)} min`],
-                ["Graded", b.grade_each_stage ? "after every stage" : "after the last stage"], ["Robustness probes", b.has_probes ? "yes (used in code quality)" : "no"]]} />
+              <KV items={[["Grader", GRADER_LABEL[b.grader.type] || `script ${b.grader.path}`], ["Grader timeout", `${Math.round(b.grader.timeout_s / 60)} min`],
+                ["Graded", b.grade_each_stage ? "after every stage" : "after the last stage"], ["Robustness probes", b.has_probes ? "yes (used in code quality)" : "no"],
+                ...(b.env ? [["Environment", <span className="mono small">{b.env.image}{b.env.platform ? ` (${b.env.platform})` : ""}</span>] as [string, React.ReactNode]] : []),
+                ...(b.swebench ? [["Tests", `${b.swebench.fail_to_pass} FAIL_TO_PASS · ${b.swebench.pass_to_pass} PASS_TO_PASS`] as [string, React.ReactNode]] : []),
+                ...(b.source ? [["Source", <a href={b.source.url} target="_blank" rel="noreferrer">{b.source.name} <ExternalLink size={11} /></a>] as [string, React.ReactNode]] : [])]} />
               <FileList title="Hidden grader files" files={b.grader_files} />
               {vjob && <JobPanel jobId={vjob} compact title="Validating the grader" />}
               {report && <ValidationReport r={report} />}
-              {!vjob && <Notice>Validation grades the untouched starting workspace (it should fail) and the reference solution (it should pass).</Notice>}
+              {!vjob && <Notice>{b.grader.type === "swebench"
+                ? "Validation grades the task's gold patch with the official harness: it must resolve, or the image or harness is broken on this machine. The first run pulls the image (1-5 GB)."
+                : "Validation grades the untouched starting workspace (it should fail) and the reference solution (it should pass)."}</Notice>}
             </div>
           )}
         </>
@@ -237,6 +257,11 @@ function BenchmarkDrawer({ id, onClose }: { id: string; onClose: () => void }) {
     </Drawer>
   );
 }
+
+const GRADER_LABEL: Record<string, string> = {
+  spec: "hidden pytest files + checks", swebench: "official SWE-bench harness (resolved = all FAIL_TO_PASS and PASS_TO_PASS pass)",
+  polyglot: "original Exercism tests, all enabled (solved = every test passes)",
+};
 
 function ValidationReport({ r }: { r: any }) {
   const row = (label: string, g: any, want: string) => g && (
@@ -248,7 +273,7 @@ function ValidationReport({ r }: { r: any }) {
   return (
     <Card title={<span className="row">{r.ok ? <CheckCircle2 size={16} className="ok" /> : <XCircle size={16} className="danger" />} {r.ok ? "Grader looks correct" : "Grader needs attention"}</span>}>
       {row("Starting workspace", r.starter, "should fail")}
-      {row("Reference solution", r.reference, "should pass")}
+      {row(r.reference?.resolved !== undefined ? "Gold patch" : "Reference solution", r.reference, r.reference?.resolved !== undefined ? "should resolve" : "should pass")}
       {r.note && <p className="tiny muted mt-8">{r.note}</p>}
       {r.problems?.map((p: string, i: number) => <Notice key={i} tone="danger">{p}</Notice>)}
     </Card>

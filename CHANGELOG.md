@@ -9,6 +9,51 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **Apple Silicon and ARM64**: LLMDyno now runs on macOS (Apple Silicon), Linux on ARM64 and Windows on ARM, as well
+  as x86-64. Detection covers ARM CPU features (NEON, dot product, i8mm, SVE), performance and efficiency cores,
+  Apple GPUs (chip, GPU cores, bandwidth) and Qualcomm Adreno. The Setup page explains the Metal memory limit and
+  offers the command to raise it, and on ARM64 hosts it notes that SWE-bench images need x86-64 emulation.
+- **llama.cpp builds for every platform**: release assets are parsed instead of hard-coded, so the installer picks
+  the right archive for the OS, CPU architecture and backend (CUDA 12/13, Metal, Vulkan, ROCm, SYCL, OpenVINO,
+  OpenCL for Adreno, CPU) and keeps working when llama.cpp moves to a new CUDA version (it just did, to 13.5).
+- **Unified memory**: on Apple Silicon the memory check plans against the GPU's share of unified memory, reports
+  going over it as out of memory (swap) rather than a spill, and offers smaller context or quant fixes instead of
+  CPU offload. Runs record GPU memory in use and utilisation from IOAccelerator statistics.
+- **SWE-bench**: import Verified, Lite or Verified mini from the official datasets. Agents work inside each task's
+  official image; patches are graded by the official `swebench` harness (installed into its own venv from Setup), so
+  "resolved" means what it means on the leaderboard. Validate grades a task's gold patch. Plans export their patches
+  in the SWE-bench predictions format.
+- **Aider polyglot**: import the 225 exercises (C++, Go, Java, JavaScript, Python, Rust) with suites per language,
+  and build the toolchain image from Setup. Every test is enabled, the original tests are restored before grading,
+  and an exercise is solved only when all of them pass.
+- **Artificial Analysis reference**: with a free API key (Settings), Results shows each profile's model with its
+  Intelligence Index, output speed, TTFT and 3:1 blended price next to what LLMDyno measured, with attribution.
+  Matches are automatic and can be corrected per profile.
+- **Portable harness runtimes**: each harness can be built once into a self-contained folder that is mounted into
+  any benchmark image, which is how every harness runs SWE-bench and polyglot tasks. Benchmarks can name their own
+  image (`env` in `benchmark.json`), so custom tasks can use this too.
+- Results: a Public benchmarks card (SWE-bench resolved rate, polyglot solved rate per language).
+- **Re-grade**: a finished run can be graded again from the workspace (or SWE-bench patch) it left behind, without
+  running the agent again, for when a grader is fixed after the fact. Token, time and GPU figures are kept.
+- CI runs on Apple Silicon, Linux ARM64 and Windows on ARM; `scripts/platform_probe.py` prints what LLMDyno detects.
+
+### Changed
+
+- `setup.sh` accepts macOS and ARM64. Docker Desktop on macOS can be started from Setup, with a Homebrew install
+  command when it is missing.
+- On macOS the data folder for pip installs is `~/Library/Application Support/LLMDyno`.
+- llama-server's bind address can be overridden with the `llama_bind_host` setting.
+
+### Fixed
+
+- Setup spots Docker Desktop on Windows stuck at start-up ("The file cannot be accessed by the system") because a
+  crash left socket files behind, and offers a one-click fix that moves them aside. "Reset to factory defaults",
+  which Docker suggests, would delete every image.
+- Leaderboard bars add up to the final score when a configuration has no code-quality score (before, they were
+  scaled as if quality counted as zero while the score left it out).
+
 ## [0.1.0] - 2026-10-26
 
 First public release.

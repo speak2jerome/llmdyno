@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Download, FileCode2, Folder, RotateCcw, Square, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, FileCode2, Folder, RotateCcw, ShieldCheck, Square, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Logo, profileLogo } from "../logos";
@@ -115,6 +115,13 @@ export default function RunDetail() {
             if (!(await confirm({ title: "Stop this run?", danger: true, confirm: "Stop run" })).ok) return;
             api.post(`/runs/${id}/cancel`).then(() => toast.info("Stopping…")).catch((e) => toast.err("Could not stop", e));
           }}>Stop</Button>}
+          {run.status === "done" && !sample && run.dir && <Button icon={<ShieldCheck size={14} />}
+            title="Grade the agent's work again with the current grader, without re-running the agent"
+            onClick={async () => {
+              if (!(await confirm({ title: "Grade this run again?", confirm: "Re-grade",
+                body: "Runs the current grader on the workspace this run left behind. The agent is not run again; tokens, time and GPU numbers stay as they are." })).ok) return;
+              api.post(`/runs/${id}/regrade`).then(() => toast.info("Grading again", "The scores update when it finishes.")).catch((e) => toast.err("Could not re-grade", e));
+            }}>Re-grade</Button>}
           {!live && !sample && <Button icon={<RotateCcw size={14} />} onClick={() => api.post(`/runs/${id}/retry`).then(() => { toast.ok("Run queued again"); nav(`/plans/${run.plan_id}`); }).catch((e) => toast.err("Could not retry", e))}>Retry</Button>}
           {!sample && run.dir && <Button icon={<Download size={14} />} onClick={() => download(`/runs/${id}/download`)}>Workspace .zip</Button>}
         </>} />

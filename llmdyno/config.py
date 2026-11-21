@@ -1,6 +1,7 @@
 """Paths and persistent settings."""
 import json
 import os
+import sys
 import threading
 from pathlib import Path
 
@@ -14,6 +15,8 @@ def _default_data():
         return ROOT / "data"
     if os.name == "nt":
         return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "LLMDyno"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "LLMDyno"
     return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "llmdyno"
 
 
@@ -35,6 +38,13 @@ DEFAULTS = {
     "quality_weights": {"static": 35, "probes": 30, "review": 35},
     "llama_cpp": {"path": "", "version": "", "backend": ""},
     "hf_token_set": False,
+    # address llama-server listens on so sandboxes can reach it; empty picks 127.0.0.1 on Windows/macOS
+    # (Docker Desktop forwards host.docker.internal) and the bridge gateway on Linux
+    "llama_bind_host": "",
+    # version of the official SWE-bench harness installed into its own venv (Setup page)
+    "swebench": {"harness_version": "5.0.2"},
+    # Artificial Analysis reference matches picked by hand: {profile id: AA model slug}
+    "aa_reference": {"overrides": {}},
 }
 
 _lock = threading.Lock()

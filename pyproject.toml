@@ -14,6 +14,7 @@ authors = [{ name = "speak2jerome", email = "speak2jerome@gmail.com" }]
 keywords = [
   "llm", "benchmark", "coding-agent", "llama.cpp", "gguf", "local-llm", "vram", "llm-as-a-judge", "evaluation",
   "openai", "anthropic", "claude", "gemini", "qwen", "gemma", "deepseek", "opencode", "codex", "aider", "swe-agent",
+  "swe-bench", "aider-polyglot", "artificial-analysis", "apple-silicon", "arm64", "metal",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -21,6 +22,7 @@ classifiers = [
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
   "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",

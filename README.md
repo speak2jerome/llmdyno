@@ -7,7 +7,8 @@
   <a href="https://github.com/speak2jerome/llmdyno/releases"><img src="https://img.shields.io/github/v/release/speak2jerome/llmdyno?include_prereleases&label=release" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20(x86--64)-lightgrey" alt="Windows and Linux on x86-64">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" alt="Windows, Linux and macOS">
+  <img src="https://img.shields.io/badge/arch-x86--64%20%7C%20ARM64%20%7C%20Apple%20Silicon-lightgrey" alt="x86-64, ARM64 and Apple Silicon">
 </p>
 
 # LLMDyno
@@ -17,6 +18,10 @@ through llama.cpp on your own GPU, or APIs such as OpenAI, Anthropic, Gemini, De
 harness (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent), and LLMDyno runs real multi-file coding
 tasks in offline Docker sandboxes. Hidden tests grade the result, LLM judges review the code blind, and a dashboard
 compares correctness, code quality, speed, VRAM and cost.
+
+Besides its own tasks it runs **SWE-bench** (Verified, Lite or the 50-task Verified mini, graded by the official
+harness) and the **Aider polyglot** benchmark, and shows **Artificial Analysis** reference numbers next to your own
+measurements. It works on Windows, Linux and macOS, on x86-64, ARM64 and Apple Silicon.
 
 It's a dyno for models: it measures what a model actually does on your machine, with your settings, rather than what
 a leaderboard says it does on someone else's.
@@ -29,6 +34,7 @@ a leaderboard says it does on someone else's.
 - [Features](#features)
 - [Quick start](#quick-start)
 - [Round 1 results: 15 configurations on an RTX 5080](#round-1-results-15-configurations-on-an-rtx-5080)
+- [Public benchmarks: SWE-bench, Aider polyglot, Artificial Analysis](#public-benchmarks-swe-bench-aider-polyglot-artificial-analysis)
 - [How it works](#how-it-works)
 - [Supported harnesses, providers and hardware](#supported-harnesses-providers-and-hardware)
 - [FAQ](#faq)
@@ -51,8 +57,12 @@ a model failed.
 ## Features
 
 **Hardware-aware setup**
-- Detects CPU (AVX2/AVX-512), RAM, NVIDIA/AMD/Intel GPUs, driver, CUDA version, disks and Docker on x86-64 Windows and Linux.
-- Installs a matching prebuilt [llama.cpp](https://github.com/ggml-org/llama.cpp) build (CUDA 12/13, Vulkan, ROCm, SYCL or CPU), or uses yours.
+- Detects CPU features (AVX2/AVX-512 on x86-64; NEON, dot product, i8mm and SVE on ARM), RAM, NVIDIA/AMD/Intel/Apple
+  GPUs, driver, CUDA version, disks and Docker on Windows, Linux and macOS.
+- Installs a matching prebuilt [llama.cpp](https://github.com/ggml-org/llama.cpp) build for your OS and CPU
+  architecture (CUDA 12/13, Metal, Vulkan, ROCm, SYCL, OpenCL for Adreno, or CPU), or uses yours.
+- On Apple Silicon it plans memory around the GPU's share of unified memory (the Metal working-set limit), not the
+  whole RAM, and tells you how to raise that limit.
 
 **Models and memory fit**
 - Search Hugging Face, check the fit before you download, then download with resume and SHA-256 verification.
@@ -79,7 +89,8 @@ look the same whichever harness ran.
 
 **Benchmarks**: six built-in tasks with hidden tests (a CLI smoke test, a Flask site, a FastAPI service with a
 TypeScript client, a five-stage iterative build, a data pipeline with a churn model, and a bug-fix task). Write your
-own in the editor; a validator checks that the starter fails and the reference passes.
+own in the editor; a validator checks that the starter fails and the reference passes. Import SWE-bench and the Aider
+polyglot benchmark from the Benchmarks page (see below).
 
 **Plans**: profiles × harnesses × benchmarks × iterations. Preflight checks compatibility, memory and budget; local
 runs share the GPU one model at a time while cloud runs go in parallel. Pause, resume, retry and cancel at any point.
@@ -105,8 +116,9 @@ progress from another tab.
 
 ## Quick start
 
-**Requirements**: Windows 10/11 or Linux on x86-64, Python 3.11+, and Docker (Docker Desktop on Windows). An NVIDIA,
-AMD or Intel GPU is recommended for local models; cloud-only use works without one.
+**Requirements**: Windows 10/11, Linux or macOS 13+, on x86-64 or ARM64 (Apple Silicon included), Python 3.11+, and
+Docker (Docker Desktop on Windows and macOS). A GPU is recommended for local models (NVIDIA, AMD, Intel, or any Apple
+Silicon Mac); cloud-only use works without one.
 
 ```bash
 git clone https://github.com/speak2jerome/llmdyno.git
@@ -119,7 +131,7 @@ Windows (PowerShell):
 powershell -ExecutionPolicy Bypass -File setup.ps1
 ```
 
-Linux:
+Linux and macOS:
 
 ```bash
 ./setup.sh
@@ -136,8 +148,9 @@ Want to look around first? **Settings → Sample results** loads the round-1 stu
 before you run anything.
 
 Other commands: `llmdyno doctor` (check dependencies), `llmdyno specs` (print the detected hardware),
-`llmdyno --version`. Data lives in `./data` inside the checkout (or `%LOCALAPPDATA%\LLMDyno` / `~/.local/share/llmdyno`
-for a pip install), or wherever `LLMDYNO_DATA` points.
+`llmdyno --version`. Data lives in `./data` inside the checkout (or `%LOCALAPPDATA%\LLMDyno`,
+`~/Library/Application Support/LLMDyno` or `~/.local/share/llmdyno` for a pip install), or wherever `LLMDYNO_DATA`
+points.
 
 ## Round 1 results: 15 configurations on an RTX 5080
 
@@ -184,6 +197,36 @@ What stood out:
 These are five tasks with one iteration each, so treat single-digit gaps as noise. LLMDyno reports confidence
 intervals once you run more iterations.
 
+## Public benchmarks: SWE-bench, Aider polyglot, Artificial Analysis
+
+LLMDyno's own tasks tell you how a setup does on work like yours. Public benchmarks tell you how it compares with
+everyone else's numbers. **Benchmarks → Import SWE-bench / polyglot** brings them in as ordinary benchmarks, so they
+go into suites and plans like any other task and every harness can run them.
+
+**SWE-bench** ([swebench.com](https://www.swebench.com)). Pick Verified (500 tasks), Lite (300) or Verified mini (50,
+a good first run). Each task is a real GitHub issue. The agent works inside the task's official Docker image, with the
+repository at `/testbed` and its Python environment ready, and never sees the tests. When it finishes, LLMDyno takes
+its changes as a git diff against the task's base commit and grades them with the official `swebench` harness
+(installed into its own virtual environment from the Setup page). A task counts as resolved only if every
+FAIL_TO_PASS and PASS_TO_PASS test passes, exactly as on the public leaderboard. **SWE-bench predictions** on a plan
+exports the patches in the standard JSONL format, so you can re-grade or submit them elsewhere.
+
+**Aider polyglot** ([leaderboard](https://aider.chat/docs/leaderboards/)). 225 hard Exercism exercises in C++, Go,
+Java, JavaScript, Python and Rust. They run in a toolchain image LLMDyno builds once (about 4 GB) with every test
+enabled, the way Aider runs them; an exercise is solved when all of its tests pass. One difference: Aider gives the
+model two tries with the test output in between, while LLMDyno's agents run the tests themselves as often as they
+like, so solved rates are close to Aider's numbers but not identical.
+
+**Artificial Analysis** ([artificialanalysis.ai](https://artificialanalysis.ai)). Add a free API key in Settings and
+the Results page shows each profile's model with its public Intelligence Index, output speed, time to first token and
+3:1 blended price, next to the speed and correctness LLMDyno measured on your machine. Matching is automatic by model
+name and you can correct it per profile. Data is cached and refreshed at most twice a day, well inside the free
+tier's 100 requests per day, and always shown with a link back to the source.
+
+How harnesses run inside someone else's image: each harness is also built once as a small portable runtime (Node, the
+agent CLI and ripgrep, or a standalone Python for Aider and mini-SWE-agent) and mounted into the task image, so
+nothing is rebuilt per task.
+
 ## How it works
 
 ```mermaid
@@ -223,8 +266,19 @@ More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Adding things: [harne
 **Providers**: OpenAI, Anthropic, Google Gemini, DeepSeek, Moonshot (Kimi), Z.ai (GLM), Qwen (DashScope), MiniMax,
 xAI, Mistral, OpenRouter, Groq, Together, Fireworks, Cerebras, and any OpenAI-compatible URL (vLLM, LM Studio, Ollama).
 
-**Hardware**: x86-64 only for now (Windows 10/11, Linux). NVIDIA CUDA 12/13, AMD ROCm or Vulkan, Intel SYCL or
-Vulkan, or CPU-only. Apple Silicon and ARM are on the roadmap.
+**Hardware and platforms**:
+
+| Platform | llama.cpp build | GPU telemetry | Notes |
+|---|---|---|---|
+| Windows 10/11, x86-64 | CUDA 12/13, Vulkan, SYCL, CPU | VRAM, power, temperature, shared-memory spill | tested most |
+| Linux, x86-64 | CUDA 12/13, Vulkan, ROCm, SYCL, OpenVINO, CPU | VRAM, power, temperature | |
+| macOS 13+, Apple Silicon | Metal | GPU memory in use, utilisation | unified memory: plans against the Metal working-set limit; power needs root, so local runs have no energy cost |
+| Linux, ARM64 (Graviton, Ampere, Grace, Raspberry Pi 5) | CPU, Vulkan, CUDA 13 (Grace) | NVIDIA if present | |
+| Windows on ARM (Snapdragon X) | CPU, OpenCL for Adreno, Vulkan | – | experimental |
+
+SWE-bench's task images are x86-64 only. On ARM64 machines they run under emulation (Rosetta in Docker Desktop on
+Apple Silicon, QEMU binfmt on Linux), which works but makes the test runs two to five times slower; LLMDyno warns you
+in the plan preflight. Everything else, including the sandbox, harness and polyglot images, builds natively for ARM64.
 
 ## FAQ
 
@@ -235,6 +289,13 @@ hidden tests, on local models (llama.cpp) or cloud APIs, and compares correctnes
 ### How is it different from SWE-bench or Aider's leaderboard?
 Those publish fixed results for fixed setups. LLMDyno is a tool you run yourself, so you can test the exact quant,
 context size, KV cache and harness you'd actually use, on your own GPU, and compare them with cloud models on equal terms.
+It can also run SWE-bench and the Aider polyglot benchmark themselves, graded the official way, so your numbers line up
+with the public ones.
+
+### Does it run on a Mac or on ARM?
+Yes. On Apple Silicon it installs the Metal build of llama.cpp and treats the GPU's share of unified memory as its
+budget, which by default is about two thirds of RAM on Macs up to 36 GB and three quarters above that. Linux on ARM64
+and Windows on ARM work too; see the platform table above.
 
 ### Will my model fit in VRAM?
 LLMDyno estimates it from the GGUF header before you download, and checks it exactly with `llama-fit-params` once the
@@ -251,8 +312,8 @@ Each provider and each plan has a hard budget. The proxy between the agent and t
 budget is reached, and it counts spend even for requests that are cut off mid-stream. The panic stop halts everything.
 
 ### Are my API keys safe?
-Keys are encrypted at rest (Windows DPAPI; file permissions on Linux) and only the per-run proxy container receives
-one. Agents get a placeholder key and have no internet access.
+Keys are encrypted at rest (Windows DPAPI; file permissions on Linux and macOS) and only the per-run proxy container
+receives one. Agents get a placeholder key and have no internet access.
 
 ### Which harness should I use?
 Run the same models through several and compare; the dashboard has a harness comparison chart. In our smoke tests

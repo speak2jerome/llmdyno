@@ -9,6 +9,8 @@ import shlex
 
 HOME = "/home/agent"
 WORKSPACE = "/workspace"
+RT = "/opt/dyno-rt"          # portable harness runtime, mounted into benchmark environment images (SWE-bench, polyglot)
+UV_VERSION = "0.13.6"
 
 
 class RunCtx:
@@ -38,13 +40,40 @@ class Harness:
     strengths = []
     caveats = []
     builtin = True
+    venv = None                  # (name, pip spec, [bins]) for Python harnesses
 
     def image(self):
         return f"llmdyno-harness-{self.id}:{self.version}"
 
     def install(self):
         """Dockerfile lines appended after FROM the sandbox base."""
+        if self.venv:
+            return venv_install(*self.venv) + self.env_lines()
         return []
+
+    def env_lines(self):
+        return []
+
+    def runtime_install(self):
+        """Dockerfile lines for the portable runtime (prefix /opt/dyno-rt, built on Ubuntu 22.04). The runtime is
+        mounted into benchmark images that bring their own OS, so nothing may live outside the prefix."""
+        if self.venv:
+            name, spec, bins = self.venv
+            links = " && ".join(f"ln -sf ../venv/{name}/bin/{b} {RT}/bin/{b}" for b in bins)
+            return [f"RUN uv venv --python 3.12 {RT}/venv/{name} && uv pip install --python {RT}/venv/{name}/bin/python "
+                    f"{spec} && {links}"] + [rt_path(x) for x in self.env_lines()]
+        return [rt_path(x) for x in self.install()]
+
+    def runtime_env(self):
+        """ENV lines of the runtime install as a dict; a mounted runtime cannot set them, so the run passes them."""
+        out = {}
+        for line in self.runtime_install():
+            if line.startswith("ENV "):
+                for tok in shlex.split(line[4:]):
+                    if "=" in tok:
+                        k, v = tok.split("=", 1)
+                        out[k] = v
+        return out
 
     def dockerfile(self, base):
         lines = [f"FROM {base}", "USER root"] + self.install()
@@ -73,6 +102,11 @@ class Harness:
 
 def npm_install(pkg):
     return [f"RUN npm_config_offline=false npm install -g --no-audit --no-fund {pkg} && npm cache clean --force"]
+
+
+def rt_path(line):
+    """Move paths a harness install uses outside its package folder into the runtime prefix."""
+    return line.replace("/opt/xdg-cache", f"{RT}/xdg-cache")
 
 
 def venv_install(name, spec, bins):
@@ -218,9 +252,10 @@ class Aider(Harness):
     caveats = ["not autonomous: it does not run tests or iterate on its own unless the model asks for shell commands",
                "one message per stage"]
 
-    def install(self):
-        return venv_install("aider", f"aider-chat=={self.version}", ["aider"]) + [
-            "ENV AIDER_CHECK_UPDATE=false AIDER_ANALYTICS=false LITELLM_LOCAL_MODEL_COST_MAP=True"]
+    venv = ("aider", f"aider-chat=={version}", ["aider"])
+
+    def env_lines(self):
+        return ["ENV AIDER_CHECK_UPDATE=false AIDER_ANALYTICS=false LITELLM_LOCAL_MODEL_COST_MAP=True"]
 
     def files(self, rc):
         meta = {f"openai/{rc.model}": {"max_input_tokens": rc.ctx, "max_output_tokens": rc.max_tokens,
@@ -249,10 +284,12 @@ class MiniSwe(Harness):
     strengths = ["tiny prompt, very little overhead", "tests raw model ability with a single tool"]
     caveats = ["new session per stage (the workspace carries over)"]
 
-    def install(self):
-        # litellm imports its MCP client lazily; without the package every request fails
-        return venv_install("mini", f"mini-swe-agent=={self.version} mcp", ["mini"]) + [
-            "ENV MSWEA_CONFIGURED=true MSWEA_COST_TRACKING=ignore_errors MSWEA_SILENT_STARTUP=1 LITELLM_LOCAL_MODEL_COST_MAP=True"]
+    # litellm imports its MCP client lazily; without the package every request fails
+    venv = ("mini", f"mini-swe-agent=={version} mcp", ["mini"])
+
+    def env_lines(self):
+        return ["ENV MSWEA_CONFIGURED=true MSWEA_COST_TRACKING=ignore_errors MSWEA_SILENT_STARTUP=1 "
+                "LITELLM_LOCAL_MODEL_COST_MAP=True"]
 
     def env(self, rc):
         return {"OPENAI_API_BASE": rc.openai_base, "OPENAI_BASE_URL": rc.openai_base,

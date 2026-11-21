@@ -21,71 +21,137 @@ IS_WIN = os.name == "nt"
 EXE = ".exe" if IS_WIN else ""
 
 
+# ------------------------------------------------------------------ release assets
+# Release assets are named like llama-b12606-bin-win-cuda-13.5-x64.zip, llama-b12606-bin-macos-arm64.tar.gz or
+# llama-b12606-bin-ubuntu-vulkan-arm64.tar.gz; CUDA builds come with a separate cudart-llama-... runtime archive.
+# The names are parsed rather than hardcoded because the CUDA/ROCm/OpenVINO versions move with every few releases.
+ASSET_RE = re.compile(r"^llama-(?P<tag>b\d+)-bin-(?P<os>win|ubuntu|macos|linux)-(?P<spec>.+?)\.(?:zip|tar\.gz)$")
+CUDART_RE = re.compile(r"^cudart-llama-(?:b\d+-)?bin-(?P<os>win|ubuntu)-cuda-(?P<ver>[\d.]+)-(?P<arch>x64|arm64)\."
+                       r"(?:zip|tar\.gz)$")
+ARCHES = ("x64", "arm64", "s390x")
+OS_KEYS = {"windows": ("win",), "linux": ("ubuntu", "linux"), "macos": ("macos",)}
+
+
+def parse_asset(name):
+    """-> {os, arch, backend, version, flavor} for a llama.cpp binary archive, or None for anything else."""
+    m = ASSET_RE.match(name)
+    if not m:
+        return None
+    toks = m.group("spec").split("-")
+    arch = next((t for t in toks if t in ARCHES), None)
+    if not arch:
+        return None
+    ver = next((t for t in toks if re.fullmatch(r"\d+(\.\d+)+", t)), None)
+    rest = [t for t in toks if t != arch and t != ver]
+    os_ = m.group("os")
+    if not rest:                                   # ubuntu-x64 is the CPU build; macos-arm64 includes Metal
+        backend = "metal" if os_ == "macos" and arch == "arm64" else "cpu"
+    elif rest[0] == "opencl":
+        backend = "opencl-" + "-".join(rest[1:]) if rest[1:] else "opencl"
+    else:
+        backend = rest[0]
+    flavor = "-".join(rest[1:]) if backend in ("sycl",) else ""
+    return {"tag": m.group("tag"), "os": os_, "arch": arch, "backend": backend, "version": ver, "flavor": flavor}
+
+
+def _ver_key(v):
+    return tuple(int(x) for x in (v or "0").split("."))
+
+
+def pick_assets(assets, os_family, arch, variant):
+    """Main archive (plus the CUDA runtime archive when there is one) for a variant id such as 'cuda-13', 'cuda-12',
+    'vulkan', 'metal', 'rocm', 'sycl', 'openvino', 'opencl-adreno' or 'cpu' on this OS/arch. None if absent."""
+    want_backend, _, want_major = variant.partition("-") if variant.startswith("cuda-") else (variant, "", "")
+    cands = []
+    for a in assets:
+        p = parse_asset(a["name"])
+        if not p or p["os"] not in OS_KEYS[os_family] or p["arch"] != arch or p["backend"] != want_backend:
+            continue
+        if want_major and not (p["version"] or "").startswith(want_major + "."):
+            continue
+        if p["backend"] == "sycl" and p["flavor"] not in ("", "fp16"):
+            continue                               # fp16 is the faster SYCL build; fp32 is for old iGPUs
+        cands.append((p, a))
+    if not cands:
+        return None
+    p, main = max(cands, key=lambda c: _ver_key(c[0]["version"]))
+    if p["backend"] != "cuda":
+        return [main]
+    rt = next((a for a in assets if (m := CUDART_RE.match(a["name"])) and m["os"] == p["os"] and m["arch"] == arch
+               and m["ver"] == p["version"]), None)
+    return [main, rt] if rt else ([main] if os_family != "windows" else None)   # Windows needs the CUDA DLLs
+
+
+def available_backends(assets, os_family, arch):
+    """Every variant id this release offers for the OS/arch (used to show what can be installed)."""
+    out = set()
+    for a in assets:
+        p = parse_asset(a["name"])
+        if p and p["os"] in OS_KEYS[os_family] and p["arch"] == arch:
+            out.add(f"cuda-{p['version'].split('.')[0]}" if p["backend"] == "cuda" and p["version"] else p["backend"])
+    return out
+
+
+VARIANT_LABEL = {"cuda-13": "CUDA 13", "cuda-12": "CUDA 12", "vulkan": "Vulkan", "metal": "Metal", "rocm": "ROCm",
+                 "sycl": "SYCL", "openvino": "OpenVINO", "opencl-adreno": "OpenCL (Adreno)", "cpu": "CPU only"}
+
+
 def variants(s=None):
     """Backend builds that make sense on this machine, best first."""
     s = s or sysspecs.detect()
     g = sysspecs.primary_gpu(s)
+    fam, arch = s["os"].get("family") or sysspecs.os_family(), s["os"]["arch"]
     out = []
-    if g and g["vendor"] == "NVIDIA":
-        try:
-            major = int(str(g.get("driver", "0")).split(".")[0])
-        except ValueError:
-            major = 0
-        new_cuda = major >= 580
-        if IS_WIN:
-            out += [{"id": "cuda-13.4", "label": "CUDA 13.4", "ok": new_cuda,
-                     "why": "needs NVIDIA driver 580 or newer" if not new_cuda else "best for this GPU"},
-                    {"id": "cuda-12.4", "label": "CUDA 12.4", "ok": True, "why": "for older drivers"}]
-        else:
-            out += [{"id": "cuda-13.4", "label": "CUDA 13.4", "ok": new_cuda,
-                     "why": "needs NVIDIA driver 580 or newer" if not new_cuda else "best for this GPU"},
-                    {"id": "cuda-12.8", "label": "CUDA 12.8", "ok": True, "why": "for older drivers"}]
-        out.sort(key=lambda v: not v["ok"])
-    elif g and g["vendor"] == "AMD":
-        out += [{"id": "vulkan", "label": "Vulkan", "ok": True, "why": "works on most Radeon GPUs"},
-                {"id": "rocm-10.0", "label": "ROCm 10.0", "ok": True, "why": "faster on supported Radeon GPUs"}]
-    elif g and g["vendor"] == "Intel":
-        out += [{"id": "vulkan", "label": "Vulkan", "ok": True, "why": "works on Arc GPUs"},
-                {"id": "sycl", "label": "SYCL", "ok": True, "why": "Intel oneAPI build"}]
-    out += [{"id": "vulkan", "label": "Vulkan", "ok": True, "why": "generic GPU build"},
-            {"id": "cpu", "label": "CPU only", "ok": True, "why": "no GPU acceleration"}]
+    if fam == "macos":
+        if arch == "arm64":
+            out.append({"id": "metal", "ok": True, "why": "Apple GPU through Metal, using unified memory"})
+        out.append({"id": "cpu", "ok": True, "why": "Intel Mac: CPU build" if arch == "x64" else "no GPU acceleration"})
+    else:
+        if g and g["vendor"] == "NVIDIA":
+            try:
+                major = int(str(g.get("driver", "0")).split(".")[0])
+            except ValueError:
+                major = 0
+            new_cuda = major >= 580
+            out += [{"id": "cuda-13", "ok": new_cuda,
+                     "why": "best for this GPU" if new_cuda else "needs NVIDIA driver 580 or newer"},
+                    {"id": "cuda-12", "ok": True, "why": "for older drivers"}]
+            out.sort(key=lambda v: not v["ok"])
+        elif g and g["vendor"] == "AMD":
+            out += [{"id": "vulkan", "ok": True, "why": "works on most Radeon GPUs"},
+                    {"id": "rocm", "ok": True, "why": "faster on supported Radeon GPUs"}]
+        elif g and g["vendor"] == "Intel":
+            out += [{"id": "vulkan", "ok": True, "why": "works on Arc GPUs"},
+                    {"id": "sycl", "ok": True, "why": "Intel oneAPI build"},
+                    {"id": "openvino", "ok": True, "why": "Intel OpenVINO build"}]
+        elif g and g.get("backend") == "opencl-adreno":
+            out.append({"id": "opencl-adreno", "ok": True, "why": "Snapdragon Adreno GPU"})
+        out += [{"id": "vulkan", "ok": True, "why": "generic GPU build"},
+                {"id": "cpu", "ok": True, "why": "no GPU acceleration"}]
     seen, uniq = set(), []
     for v in out:
         if v["id"] not in seen:
             seen.add(v["id"])
-            uniq.append(v)
+            uniq.append({**v, "label": VARIANT_LABEL.get(v["id"], v["id"])})
     return uniq
 
 
-def asset_names(tag, variant):
-    """(main asset, optional runtime asset) for this OS. Returns regexes because cudart names vary by OS."""
-    if IS_WIN:
-        main = {"cpu": f"llama-{tag}-bin-win-cpu-x64.zip", "vulkan": f"llama-{tag}-bin-win-vulkan-x64.zip",
-                "sycl": f"llama-{tag}-bin-win-sycl-x64.zip", "rocm-10.0": f"llama-{tag}-bin-win-rocm-10.0-x64.zip"}.get(
-            variant, f"llama-{tag}-bin-win-{variant}-x64.zip")
-        rt = f"cudart-llama-bin-win-{variant}-x64.zip" if variant.startswith("cuda") else None
-    else:
-        main = {"cpu": f"llama-{tag}-bin-ubuntu-x64.tar.gz", "vulkan": f"llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz",
-                "sycl": f"llama-{tag}-bin-ubuntu-sycl-fp16-x64.tar.gz",
-                "rocm-10.0": f"llama-{tag}-bin-ubuntu-rocm-10.0-x64.tar.gz"}.get(
-            variant, f"llama-{tag}-bin-ubuntu-{variant}-x64.tar.gz")
-        rt = f"cudart-llama-{tag}-bin-ubuntu-{variant}-x64.tar.gz" if variant.startswith("cuda") else None
-    return main, rt
-
-
-def find_release(variant):
-    """Newest release whose assets for `variant` are fully uploaded (fresh builds upload over a few minutes)."""
+def find_release(variant, os_family=None, arch=None):
+    """Newest release whose assets for `variant` on this OS/arch are fully uploaded (fresh builds upload over a few
+    minutes, so the very newest tag can be incomplete)."""
+    os_family = os_family or sysspecs.os_family()
+    arch = arch or sysspecs.norm_arch()
     r = httpx.get(RELEASES_API, timeout=30, headers={"Accept": "application/vnd.github+json"})
     r.raise_for_status()
     for rel in r.json():
-        tag = rel["tag_name"]
-        if not re.fullmatch(r"b\d+", tag):
+        if not re.fullmatch(r"b\d+", rel["tag_name"]):
             continue
-        assets = {a["name"]: a for a in rel.get("assets", []) if a.get("state", "uploaded") == "uploaded"}
-        main, rt = asset_names(tag, variant)
-        if main in assets and (rt is None or rt in assets):
-            return {"tag": tag, "published_at": rel["published_at"], "assets": [assets[main]] + ([assets[rt]] if rt else [])}
-    raise RuntimeError(f"no recent llama.cpp release has a {variant} build for this OS")
+        assets = [a for a in rel.get("assets", []) if a.get("state", "uploaded") == "uploaded"]
+        chosen = pick_assets(assets, os_family, arch, variant)
+        if chosen:
+            return {"tag": rel["tag_name"], "published_at": rel["published_at"], "assets": chosen}
+    raise RuntimeError(f"no recent llama.cpp release has a {VARIANT_LABEL.get(variant, variant)} build for "
+                       f"{os_family}/{arch}")
 
 
 def installed():
@@ -177,6 +243,9 @@ def install(ctx):
         for f in bindir.iterdir():
             if f.is_file() and not f.suffix:
                 f.chmod(0o755)
+    if sysspecs.IS_MAC:
+        # Gatekeeper refuses to run quarantined binaries; downloads made by some tools carry the flag
+        subprocess.run(["xattr", "-cr", str(tmp)], capture_output=True, timeout=60)
     # the CUDA runtime archive extracts next to the binaries on Windows; on Linux keep libs beside the server
     if bindir != tmp:
         for f in tmp.iterdir():

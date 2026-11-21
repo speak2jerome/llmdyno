@@ -67,11 +67,45 @@ my_task/
 
 The grader image has Python 3.12 and Node 24 with common libraries preinstalled; it has no internet.
 
+## Benchmarks with their own image
+
+A task that needs a particular environment (a repository with its dependencies installed, or compilers the sandbox
+doesn't have) can name a Docker image. The agent then runs inside that image instead of the LLMDyno sandbox, with the
+harness mounted in from its portable runtime. SWE-bench and Aider polyglot imports use this; your own benchmarks can
+too:
+
+```json
+"env": {
+  "image": "ghcr.io/me/my-env:1",
+  "platform": "linux/amd64",
+  "workspace": "volume",
+  "repo_dir": "/srv/app",
+  "base_commit": "0123abcd",
+  "grader_in_env": true
+}
+```
+
+- **workspace** `bind` (default): the run folder is mounted at `/workspace` as usual, starting from `workspace/`.
+  `volume`: whatever is at `repo_dir` inside the image is copied into a fresh Docker volume per run and mounted at both
+  `repo_dir` and `/workspace`, so installed packages and editable installs keep pointing at the right place.
+- **platform** defaults to the host's; set it for images built for one architecture only (they run under emulation
+  on the other).
+- **grader_in_env** runs the grader in the same image (it needs `python3` on the PATH); otherwise the grader uses
+  the standard sandbox image.
+- Images are pulled when a run starts. Images whose names start with `llmdyno-` are built locally and never pulled.
+- The image should have `bash` and `git` and run as root. If it has `/opt/miniconda3/bin/activate`, the `testbed`
+  environment is activated before the agent starts, as in the SWE-bench images.
+
+Grader types for imported tasks: `swebench` (the official harness, see the README) and `polyglot` (the exercise's
+original tests restored over the agent's copies, every test enabled, solved only if all pass).
+
 ## Validation
 
 **Validate grader** runs the grader twice: on the starter workspace, where the hidden tests should fail, and on the
 starter plus the reference solution, where they should pass. A benchmark that passes on the empty starter, or fails
-on its own reference, is flagged before anyone wastes a GPU-hour on it.
+on its own reference, is flagged before anyone wastes a GPU-hour on it. For SWE-bench tasks it grades the task's gold
+patch with the official harness instead, which must resolve; if it doesn't, the image or Docker setup on this machine
+is the problem, not the model.
 
 ## Tips for good tasks
 

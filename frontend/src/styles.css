@@ -507,3 +507,10 @@ pre.wrap { white-space: pre-wrap; word-break: break-word; }
 .version-tag { font-size: 11px; color: var(--text-3); text-align: center; font-family: var(--mono, ui-monospace, monospace); text-decoration: none; }
 .version-tag:hover { color: var(--text-2); }
 .version-tag.warn { color: var(--warn); }
+
+/* radio-style option rows (import dialog) */
+.choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--surface); }
+.choice:hover { border-color: var(--border-strong); }
+.choice.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.choice input { margin-top: 3px; accent-color: var(--accent); }
+.ml-6 { margin-left: 6px; }

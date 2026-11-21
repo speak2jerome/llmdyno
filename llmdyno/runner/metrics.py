@@ -8,6 +8,7 @@ import threading
 import time
 from pathlib import Path
 
+from ..system import apple
 from ..system import specs as sysspecs
 
 NOWIN = subprocess.CREATE_NO_WINDOW if sysspecs.IS_WIN else 0
@@ -112,11 +113,20 @@ class GpuSampler:
         self.baseline_shared = None
 
     def start(self):
-        if not shutil.which("nvidia-smi"):
+        if not (shutil.which("nvidia-smi") or sysspecs.IS_MAC):
             return self
         self.thread = threading.Thread(target=self._loop, daemon=True, name="gpu-sampler")
         self.thread.start()
         return self
+
+    def _sample_apple(self):
+        """Apple GPU from the IOAccelerator statistics (no sudo). Power needs powermetrics, which needs root, so
+        energy (and the electricity cost of local runs) is not measured on Macs."""
+        st = apple.gpu_stats(sysspecs.run)
+        g = next((x for x in sysspecs.detect()["gpus"] if x.get("unified")), {})
+        if st.get("in_use_bytes") is None:
+            raise ValueError("no IOAccelerator statistics")
+        return None, st["in_use_bytes"] / 2**20, g.get("vram_total_mib") or 0, st.get("util_pct") or 0.0, None
 
     def _loop(self):
         shared_every, n = 5, 0
@@ -124,11 +134,15 @@ class GpuSampler:
         with open(self.path, "a", encoding="utf-8") as f:
             while not self.stop_ev.is_set():
                 try:
-                    out = subprocess.run(["nvidia-smi", "--query-gpu=power.draw,memory.used,memory.total,utilization.gpu,"
-                                          "temperature.gpu", "--format=csv,noheader,nounits"], capture_output=True,
-                                         text=True, timeout=10, creationflags=NOWIN).stdout.strip().splitlines()[0]
-                    pw, used, total, util, temp = [float(x) if re.fullmatch(r"[\d.]+", x.strip()) else 0.0
-                                                   for x in out.split(",")[:5]]
+                    if sysspecs.IS_MAC:
+                        pw, used, total, util, temp = self._sample_apple()
+                    else:
+                        out = subprocess.run(["nvidia-smi", "--query-gpu=power.draw,memory.used,memory.total,"
+                                              "utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"],
+                                             capture_output=True, text=True, timeout=10,
+                                             creationflags=NOWIN).stdout.strip().splitlines()[0]
+                        pw, used, total, util, temp = [float(x) if re.fullmatch(r"[\d.]+", x.strip()) else 0.0
+                                                       for x in out.split(",")[:5]]
                     if sysspecs.IS_WIN and n % shared_every == 0:
                         adapters = sysspecs.shared_gpu_usage_mib() or {}
                         shared = max((a.get("shared", 0) for a in adapters.values()), default=0)
@@ -155,14 +169,17 @@ def gpu_metrics(path, t0, t1, baseline_shared=None):
     rows = [r for r in read_jsonl(path) if t0 <= r.get("ts", 0) <= t1]
     if len(rows) < 2:
         return {}
-    energy_ws = sum((b["ts"] - a["ts"]) * (a["power_w"] + b["power_w"]) / 2 for a, b in zip(rows, rows[1:]))
+    powered = all(r.get("power_w") is not None for r in rows)     # Apple GPUs report no power without root
+    energy_ws = sum((b["ts"] - a["ts"]) * (a["power_w"] + b["power_w"]) / 2 for a, b in zip(rows, rows[1:])) if powered else None
     shared = [r["shared_mib"] for r in rows if r.get("shared_mib") is not None]
     peak = max(r["vram_mib"] for r in rows)
     total = rows[0].get("vram_total_mib") or 0
-    out = {"gpu_energy_wh": round(energy_ws / 3600, 3), "gpu_avg_power_w": round(statistics.mean(r["power_w"] for r in rows), 1),
+    temps = [r["temp_c"] for r in rows if r.get("temp_c") is not None]
+    out = {"gpu_energy_wh": round(energy_ws / 3600, 3) if powered else None,
+           "gpu_avg_power_w": round(statistics.mean(r["power_w"] for r in rows), 1) if powered else None,
            "gpu_peak_vram_mib": peak, "gpu_vram_total_mib": total,
-           "gpu_avg_util_pct": round(statistics.mean(r["util_pct"] for r in rows), 1),
-           "gpu_max_temp_c": max(r["temp_c"] for r in rows)}
+           "gpu_avg_util_pct": round(statistics.mean(r["util_pct"] or 0 for r in rows), 1),
+           "gpu_max_temp_c": max(temps) if temps else None}
     if shared:
         base = baseline_shared if baseline_shared is not None else min(shared)
         out["gpu_shared_peak_mib"] = max(shared)

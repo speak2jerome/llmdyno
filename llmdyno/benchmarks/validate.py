@@ -11,6 +11,8 @@ def validate(ctx):
     b = registry.get(ctx.params["benchmark_id"])
     root = config.DATA / "validation" / b["id"]
     shutil.rmtree(root, ignore_errors=True)
+    if b["grader"]["type"] == "swebench":
+        return _validate_swebench(ctx, b, root)
     n = len(b["stages"])
     report = {"benchmark_id": b["id"], "stages": n}
     starter = root / "starter"
@@ -45,6 +47,34 @@ def validate(ctx):
                             "check the tests or the reference.")
     else:
         report["note"] = "No reference solution, so only the failing side was checked."
+    report["problems"] = problems
+    report["ok"] = not problems
+    ctx.result = report
+    for p in problems:
+        ctx.log("problem: " + p)
+
+
+def _validate_swebench(ctx, b, root):
+    """The official harness must resolve the instance with its gold patch; otherwise the image or harness is broken."""
+    from . import envs, swebench
+    report = {"benchmark_id": b["id"], "stages": 1, "note": "SWE-bench: the gold patch is graded by the official "
+              "harness. An empty patch is unresolved by definition, so the starting side is not graded."}
+    problems = []
+    if not swebench.harness_python().exists():
+        problems.append("The SWE-bench harness is not installed: install it on the Setup page.")
+    else:
+        env = envs.spec(b)
+        ctx.progress(0.1, f"pulling {env['image']}")
+        envs.ensure_image(env["image"], env["platform"], log=ctx.log, cancel=ctx.cancel_event)
+        ctx.progress(0.4, "grading the gold patch with the official harness")
+        g = swebench.validate_gold(b, root)
+        report["reference"] = {**_brief(g), "resolved": g.get("resolved"), "fail_to_pass": g.get("fail_to_pass"),
+                               "pass_to_pass": g.get("pass_to_pass")}
+        if g.get("grader_error"):
+            problems.append("The harness failed on the gold patch: " + g["grader_error"][-300:])
+        elif not g.get("resolved"):
+            problems.append(f"The gold patch does not resolve the instance (FAIL_TO_PASS {g.get('fail_to_pass')}, "
+                            f"PASS_TO_PASS {g.get('pass_to_pass')}): the environment is broken on this machine.")
     report["problems"] = problems
     report["ok"] = not problems
     ctx.result = report

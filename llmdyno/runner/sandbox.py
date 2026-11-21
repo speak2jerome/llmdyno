@@ -1,6 +1,7 @@
 """Docker plumbing for runs: the internal network, per-run proxy containers, agent stages and graders."""
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -12,12 +13,15 @@ import httpx
 
 from .. import config
 from ..benchmarks.registry import COMMON_DIR
+from ..harnesses.catalog import RT as RT_DIR
 from ..harnesses.images import QUALITY, SANDBOX
 
 NET = "llmdyno-internal"
 PROXY_DIR = Path(__file__).resolve().parent.parent / "proxy"
 QUALITY_DIR = Path(__file__).resolve().parent.parent / "quality"
 IS_WIN = os.name == "nt"
+IS_MAC = platform.system() == "Darwin"
+IS_LINUX = platform.system() == "Linux"
 NOWIN = subprocess.CREATE_NO_WINDOW if IS_WIN else 0
 
 
@@ -45,8 +49,12 @@ def bridge_gateway():
 
 def llama_bind_host():
     """Address llama-server listens on so that containers can reach it: loopback works with Docker Desktop's
-    host.docker.internal; on Linux the bridge gateway is used (never 0.0.0.0, to keep it off the LAN)."""
-    return "127.0.0.1" if IS_WIN else bridge_gateway()
+    host.docker.internal (Windows and macOS); on Linux the bridge gateway is used (never 0.0.0.0, to keep it off
+    the LAN). The `llama_bind_host` setting overrides it, e.g. for Colima, whose VM cannot reach host loopback."""
+    override = (config.get("llama_bind_host") or "").strip()
+    if override:
+        return override
+    return "127.0.0.1" if IS_WIN or IS_MAC else bridge_gateway()
 
 
 def kill(name):
@@ -79,7 +87,7 @@ def start_proxy(name, logs_dir, upstream, api_style, key=None, prices=None, ledg
         args = ["docker", "run", "-d", "--name", name, "--memory", "512m", "--env-file", envf.name,
                 "-v", f"{host_path(logs_dir)}:/logs", "-v", f"{host_path(PROXY_DIR)}:/app:ro",
                 "-v", f"{host_path(ledger_dir)}:/budget", "--label", "org.llmdyno.role=proxy"]
-        if not IS_WIN:
+        if IS_LINUX:                  # Docker Desktop (Windows, macOS) provides host.docker.internal itself
             args += ["--add-host", "host.docker.internal:host-gateway"]
         args += [SANDBOX, "python", "/app/llm_proxy.py"]
         r = sh(args)
@@ -102,17 +110,26 @@ def start_proxy(name, logs_dir, upstream, api_style, key=None, prices=None, ledg
     return name
 
 
-def run_stage(name, image, run_dir, stage, env, timeout_s, cpus, memory_gb, cancel_event=None):
-    """Run one harness stage. Returns {exit_code, timed_out, cancelled, wall_s}."""
+def run_stage(name, image, run_dir, stage, env, timeout_s, cpus, memory_gb, cancel_event=None, bench_env=None,
+              rt=None, run_id=None):
+    """Run one harness stage. Returns {exit_code, timed_out, cancelled, wall_s}.
+
+    bench_env/rt: the benchmark brings its own image (SWE-bench, polyglot); the harness runtime volume is mounted
+    at /opt/dyno-rt and the workspace comes from envs.workspace_mounts."""
     kill(name)
     run_dir = Path(run_dir)
     args = ["docker", "run", "--rm", "--name", name, "--network", NET, "--memory", f"{memory_gb}g",
             "--cpus", str(cpus), "--pids-limit", "4096", "--label", "org.llmdyno.role=agent",
-            "-e", "HOME=/home/agent", "-w", "/workspace",
-            "-v", f"{host_path(run_dir / 'workspace')}:/workspace", "-v", f"{host_path(run_dir / 'home')}:/home/agent",
-            "-v", f"{host_path(run_dir / 'bench')}:/bench:ro"]
-    if not IS_WIN and hasattr(os, "getuid"):
-        args += ["--user", f"{os.getuid()}:{os.getgid()}"]
+            "-e", "HOME=/home/agent", "-w", "/workspace"]
+    if bench_env:
+        from ..benchmarks import envs
+        args += ["--platform", bench_env["platform"], "-v", f"{rt['volume']}:{RT_DIR}",
+                 *envs.workspace_mounts(bench_env, run_id, host_path(run_dir / "workspace"))]
+    else:
+        args += ["-v", f"{host_path(run_dir / 'workspace')}:/workspace"]
+    args += ["-v", f"{host_path(run_dir / 'home')}:/home/agent", "-v", f"{host_path(run_dir / 'bench')}:/bench:ro"]
+    if IS_LINUX and hasattr(os, "getuid") and not bench_env:   # Docker Desktop maps file ownership itself;
+        args += ["--user", f"{os.getuid()}:{os.getgid()}"]       # environment images expect root (/testbed is root's)
     for k, v in env.items():
         args += ["-e", f"{k}={v}"]
     args += [image, "bash", f"/bench/stage{stage}.sh"]
@@ -148,14 +165,20 @@ def grade(bench, workspace, stage, timeout_s=None):
     g = bench["grader"]
     timeout_s = timeout_s or g.get("timeout_s", 600)
     tdir = Path(bench["dir"])
+    if g["type"] == "swebench":
+        from ..benchmarks import swebench
+        return swebench.grade(bench, Path(workspace), timeout_s)
+    image = (bench.get("env") or {}).get("image") if (bench.get("env") or {}).get("grader_in_env") else SANDBOX
     if g["type"] == "spec":
         cmd = "python /grader_common/spec_grade.py"
+    elif g["type"] == "polyglot":
+        cmd = "python /grader_common/polyglot_grade.py"
     else:
         cmd = f"python /task/{g['path']}"
     args = ["docker", "run", "--rm", "--network", "none", "--memory", "8g", "--label", "org.llmdyno.role=grader",
             "-v", f"{host_path(workspace)}:/work_ro:ro", "-v", f"{host_path(tdir)}:/task:ro",
             "-v", f"{host_path(COMMON_DIR)}:/grader_common:ro", "-e", f"STAGE={stage}", "-e", "WORK=/work",
-            "-e", "TASK_DIR=/task", "-e", f"SPEC={g.get('path', 'grader/spec.json')}", SANDBOX, "bash", "-c",
+            "-e", "TASK_DIR=/task", "-e", f"SPEC={g.get('path', 'grader/spec.json')}", image, "bash", "-c",
             f"cp -a /work_ro /work && cd /work && timeout {timeout_s} {cmd}"]
     t0 = time.time()
     try:
@@ -246,4 +269,7 @@ def cleanup_stale():
     ids = [x for x in r.stdout.split() if re.fullmatch(r"[0-9a-f]+", x)]
     if ids:
         sh(["docker", "rm", "-f", *ids], timeout=120)
+    vols = sh(["docker", "volume", "ls", "-q", "--filter", "label=org.llmdyno.role=workspace"], timeout=30).stdout.split()
+    if vols:
+        sh(["docker", "volume", "rm", "-f", *vols], timeout=120)
     return len(ids)

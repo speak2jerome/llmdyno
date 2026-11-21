@@ -50,6 +50,10 @@ def dep_action(dep_id: str, body: dict = Body(default={})):
     if action == "start_docker":
         deps.start_docker_desktop()
         return {"ok": True, "message": "Docker Desktop is starting; this takes about a minute."}
+    if action == "repair_docker":
+        moved = deps.repair_docker_start()
+        return {"ok": True, "message": "Docker Desktop is restarting; give it a minute."
+                + (f" Moved aside: {', '.join(moved)}." if moved else "")}
     if action == "install_docker":
         return {"job_id": jobs.submit("install", "Install Docker Desktop", deps.install_docker, ref="docker")}
     if action == "install_llama":
@@ -62,6 +66,12 @@ def dep_action(dep_id: str, body: dict = Body(default={})):
         return {"job_id": jobs.submit("build", "Build sandbox image", images.build_sandbox, ref="sandbox_image")}
     if action == "build_quality":
         return {"job_id": jobs.submit("build", "Build code-quality image", images.build_quality, ref="quality_image")}
+    if action == "install_swebench":
+        from . import external_api
+        return external_api.install_swebench_harness()
+    if action == "build_polyglot":
+        from . import external_api
+        return external_api.build_polyglot_image()
     if action.startswith("build_harness_"):
         hid = action.removeprefix("build_harness_")
         return {"job_id": _build_harness(hid)}
@@ -994,6 +1004,15 @@ def retry_run(rid: str):
         s.commit()
     job = executor.start_plan(r["plan_id"]) if plan["status"] not in ("running", "queued") else None
     return {"ok": True, "job_id": job}
+
+
+@router.post("/runs/{rid}/regrade")
+def regrade_run(rid: str):
+    r = _get(db.Run, rid)
+    if r["status"] != "done":
+        raise HTTPException(409, "only finished runs can be graded again")
+    return {"job_id": jobs.submit("validate", f"Re-grade {r['benchmark_id']}", executor.regrade_run, {"run_id": rid},
+                                  ref=rid)}
 
 
 @router.get("/runs/{rid}/transcript")

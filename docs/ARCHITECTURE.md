@@ -63,6 +63,33 @@ plan = profiles × harnesses × benchmarks × iterations
 The proxy records every model request and its streamed response in a harness-neutral form (`transcript.jsonl`), so
 the live view shows thinking, text, tool calls and tool results for **any** harness, not only ones with JSON output.
 
+### Benchmarks with their own image (SWE-bench, Aider polyglot)
+
+Built-in tasks run in `llmdyno-harness-<id>`, which is the sandbox base plus one harness. SWE-bench tasks have to run
+in their official images instead (Ubuntu 22.04, the repository at `/testbed`, a conda environment per task), and
+building every harness into every one of 500 images would waste hundreds of gigabytes. So each harness is also built
+once as a **portable runtime**: `llmdyno-rt-<id>` is an Ubuntu 22.04 image whose `/opt/dyno-rt` holds Node, the
+agent CLI and ripgrep, or a standalone Python (python-build-standalone through uv) with the harness in a venv. Its
+contents are copied into a Docker volume, and that volume is mounted at `/opt/dyno-rt` in whatever image the task
+names. Building on the oldest glibc the task images use means the binaries also run on newer bases such as the Debian
+polyglot image. ENV lines from the harness install are passed as `-e` flags, since a mounted folder can't set them.
+
+```
+per run (env benchmark):
+  1. pull the task image for its platform (linux/amd64 for SWE-bench, emulated on ARM64 hosts)
+  2. volume dyno-ws-<run> <- copy of /testbed from the image
+  3. per stage: docker run <task image> -v dyno-rt-<harness>:/opt/dyno-rt -v dyno-ws-<run>:/testbed
+                -v dyno-ws-<run>:/workspace ... bash /bench/stageN.sh   (activates conda, adds the runtime to PATH)
+  4. git diff --binary <start commit> inside the volume -> model.patch   (the image's HEAD when the volume was made:
+     SWE-bench images add their own commit on top of the task's base commit, and the harness applies patches there)
+  5. official harness (swebench.harness.run_evaluation, own venv) grades the patch -> report.json -> resolved
+     (started through swebench_shim.py, which only keeps Unix line endings on Windows: the harness writes the patch
+     and eval script in text mode, and CRLF would break git apply and bash inside the Linux container)
+  6. remove the workspace volume
+```
+
+Runtimes are prepared once per plan, before any run starts, so parallel cloud runs never race to build the same image.
+
 ## Memory projection
 
 * **Before download**: the GGUF header is read over HTTP range requests (metadata + tensor table, no weights).
@@ -72,6 +99,11 @@ the live view shows thinking, text, tool calls and tool results for **any** harn
 * **After download**: `llama-fit-params` performs a dry-run allocation for the exact arguments and reports device,
   host, KV and compute memory. LLMDyno compares this with the free VRAM it measures right now.
 * **At run time**: VRAM, Windows shared GPU memory (spill) and llama-server's own fit log are monitored.
+* **Unified memory (Apple Silicon)**: the budget is Metal's working-set limit (`iogpu.wired_limit_mb` if set,
+  otherwise about 2/3 of RAM up to 36 GB and 3/4 above), not total RAM. Going over it means swapping, not a driver
+  spill, so it is reported as out of memory. Offloading layers to the CPU saves nothing there (it is the same memory),
+  and the fix offered is a smaller context or quant instead. GPU memory in use and utilisation come from
+  IOAccelerator statistics (no root needed); power does not, so Mac runs have no energy figure.
 
 Warnings (danger / warning / info) include: exceeds VRAM (Linux OOM, Windows spill to shared memory), tight headroom,
 llama.cpp auto-fit moving layers to CPU, partial or MoE CPU offload, CPU-only inference without AVX2/AVX-512, RAM

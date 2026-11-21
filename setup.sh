@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# LLMDyno setup for Linux: creates a virtual environment, installs LLMDyno and opens it in your browser.
+# LLMDyno setup for Linux and macOS (x86-64 or ARM64, including Apple Silicon): creates a virtual environment,
+# installs LLMDyno and opens it in your browser.
 # Usage:  ./setup.sh            (re-running it is safe; it only installs what is missing)
 #         ./setup.sh --no-start (install without starting the server)
 set -euo pipefail
 cd "$(dirname "$0")"
 
+OS="$(uname -s)"
 case "$(uname -m)" in
-  x86_64|amd64) ;;
-  *) echo "LLMDyno supports x86-64 for now; this machine is $(uname -m)."; exit 1 ;;
+  x86_64|amd64|arm64|aarch64) ;;
+  *) echo "LLMDyno supports x86-64 and ARM64; this machine is $(uname -m)."; exit 1 ;;
+esac
+case "$OS" in
+  Linux|Darwin) ;;
+  *) echo "Use setup.ps1 on Windows; this script is for Linux and macOS."; exit 1 ;;
 esac
 
 PY=""
@@ -17,7 +23,11 @@ for c in python3.13 python3.12 python3.11 python3; do
   fi
 done
 if [ -z "$PY" ]; then
-  echo "LLMDyno needs Python 3.11 or newer (for example: sudo apt install python3.12 python3.12-venv)."
+  if [ "$OS" = "Darwin" ]; then
+    echo "LLMDyno needs Python 3.11 or newer (for example: brew install python@3.12)."
+  else
+    echo "LLMDyno needs Python 3.11 or newer (for example: sudo apt install python3.12 python3.12-venv)."
+  fi
   exit 1
 fi
 
@@ -35,7 +45,11 @@ echo "Installing LLMDyno ..."
 .venv/bin/python -m pip install --quiet -e .
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker was not found: install Docker Engine (https://docs.docker.com/engine/install/) and add yourself to the docker group."
+  if [ "$OS" = "Darwin" ]; then
+    echo "Docker was not found: install Docker Desktop (brew install --cask docker, or https://docs.docker.com/desktop/setup/install/mac-install/)."
+  else
+    echo "Docker was not found: install Docker Engine (https://docs.docker.com/engine/install/) and add yourself to the docker group."
+  fi
 fi
 
 echo "$(.venv/bin/llmdyno --version) is installed."

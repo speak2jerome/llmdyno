@@ -10,7 +10,7 @@ import { api } from "./api";
 import { Chart, axis } from "./charts";
 import { cls, fmtAgo, fmtBytes, fmtCtx, fmtMib, fmtNum } from "./format";
 import { Job, useJob, useJobs } from "./queries";
-import { Badge, Button, CopyButton, Input, Modal, Notice, Progress, Select, StatusBadge, Tip, useToast } from "./ui";
+import { Badge, Button, CopyButton, Input, Modal, Notice, Progress, Select, StatusBadge, Tip, useConfirm, useToast } from "./ui";
 
 /* ------------------------------------------------------------------ jobs */
 export function JobsPopover() {
@@ -97,6 +97,7 @@ export function JobPanel({ jobId, onClose, title, compact }: { jobId?: string | 
 /* ------------------------------------------------------------------ dependencies */
 export function DepRow({ dep, onJob, onChanged }: { dep: any; onJob: (id: string) => void; onChanged: () => void }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const nav = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
   const [variant, setVariant] = useState<string>(dep.actions.find((a: any) => a.variants)?.variants?.[0]?.id || "");
@@ -128,6 +129,7 @@ export function DepRow({ dep, onJob, onChanged }: { dep: any; onJob: (id: string
       setPath(dep.ok ? (dep.detail.match(/ at (.+)$/)?.[1] || "") : "");
       return setPathOpen(true);
     }
+    if (a.confirm && !(await confirm({ title: `${a.label}?`, body: a.confirm, confirm: a.label })).ok) return;
     setBusy(a.id);
     try {
       const r = await api.post(`/system/deps/${dep.id}/action`, { action: a.id, variant: variant || undefined });
@@ -186,27 +188,41 @@ export function DepRow({ dep, onJob, onChanged }: { dep: any; onJob: (id: string
 export function SystemCards({ specs }: { specs: any }) {
   if (!specs) return null;
   const g = specs.summary?.primary_gpu;
-  const others = specs.gpus.filter((x: any) => x !== g && !(g && x.uuid && x.uuid === g.uuid));
+  // the primary GPU arrives as a separate copy: match on uuid (NVIDIA) or name and vendor (Apple, AMD, Intel)
+  const others = specs.gpus.filter((x: any) => !(g && (x.uuid && g.uuid ? x.uuid === g.uuid : x.name === g.name && x.vendor === g.vendor)));
   return (
     <div className="grid grid-4">
       <div className="card kpi">
         <div className="k row muted small"><Cpu size={14} /> CPU</div>
         <div style={{ fontWeight: 620, marginTop: 6 }} className="ellipsis" title={specs.cpu.name}>{specs.cpu.name}</div>
         <div className="small text-2">{specs.cpu.cores} cores · {specs.cpu.threads} threads{specs.cpu.max_mhz ? ` · ${(specs.cpu.max_mhz / 1000).toFixed(1)} GHz` : ""}</div>
-        <div className="row mt-8" style={{ gap: 6 }}>
-          <Badge tone={specs.cpu.avx2 ? "ok" : "warn"}>AVX2 {specs.cpu.avx2 ? "yes" : "no"}</Badge>
-          <Badge tone={specs.cpu.avx512 ? "ok" : ""}>AVX-512 {specs.cpu.avx512 ? "yes" : "no"}</Badge>
+        <div className="row mt-8 wrap" style={{ gap: 6 }}>
+          {specs.cpu.isa === "arm64" ? <>
+            <Badge tone="info">ARM64</Badge>
+            <Badge tone={specs.cpu.neon ? "ok" : "warn"}>NEON {specs.cpu.neon ? "yes" : "no"}</Badge>
+            <Badge tone={specs.cpu.dotprod ? "ok" : "warn"} title="int8 dot product: fast quantized matrix math">dotprod {specs.cpu.dotprod ? "yes" : "no"}</Badge>
+            {specs.cpu.i8mm && <Badge tone="ok" title="int8 matrix multiply">i8mm</Badge>}
+            {specs.cpu.sve && <Badge tone="ok">SVE</Badge>}
+            {specs.cpu.performance_cores ? <Badge title="performance + efficiency cores">{specs.cpu.performance_cores}P + {specs.cpu.efficiency_cores}E</Badge> : null}
+          </> : <>
+            <Badge tone={specs.cpu.avx2 ? "ok" : "warn"}>AVX2 {specs.cpu.avx2 ? "yes" : "no"}</Badge>
+            <Badge tone={specs.cpu.avx512 ? "ok" : ""}>AVX-512 {specs.cpu.avx512 ? "yes" : "no"}</Badge>
+          </>}
         </div>
       </div>
       <div className="card kpi">
         <div className="k row muted small"><MonitorCog size={14} /> GPU</div>
         {g ? <>
           <div style={{ fontWeight: 620, marginTop: 6 }} className="ellipsis" title={g.name}>{g.name}</div>
-          <div className="small text-2">{fmtMib(g.vram_total_mib, 0)} VRAM · {g.vendor}{g.driver ? ` · driver ${g.driver}` : ""}</div>
+          <div className="small text-2">{g.unified
+            ? <span title={`Metal may use this much of ${fmtMib(g.ram_total_mib, 0)} unified memory`}>{fmtMib(g.vram_total_mib, 0)} GPU memory (unified) · {g.gpu_cores ? `${g.gpu_cores} GPU cores` : g.vendor}</span>
+            : <>{fmtMib(g.vram_total_mib, 0)} VRAM · {g.vendor}{g.driver ? ` · driver ${g.driver}` : ""}</>}</div>
           <div className="row mt-8 wrap" style={{ gap: 6 }}>
             {g.vram_free_mib !== null && g.vram_free_mib !== undefined && <Badge tone={g.vram_free_mib / g.vram_total_mib < 0.6 ? "warn" : "ok"}>{fmtMib(g.vram_free_mib)} free now</Badge>}
             {g.compute_cap && <Badge>CC {g.compute_cap}</Badge>}
             {g.pcie && <Badge>{g.pcie}</Badge>}
+            {g.backend && g.backend !== "cuda" && <Badge tone="info">{g.backend === "metal" ? "Metal" : g.backend}</Badge>}
+            {g.bandwidth_gbs && g.unified && <Badge title="memory bandwidth bounds token generation speed">{g.bandwidth_gbs} GB/s</Badge>}
           </div>
         </> : <div className="text-2 mt-8">No discrete GPU detected</div>}
         {others.length > 0 && <div className="tiny muted mt-8">Also: {others.map((o: any) => o.name).join(", ")}</div>}

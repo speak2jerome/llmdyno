@@ -9,7 +9,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSock
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from . import __version__, config, db, events, jobs, safety
-from .api import results_api, routes
+from .api import external_api, results_api, routes
 from .inference import llamacpp
 from .runner import sandbox
 
@@ -36,6 +36,7 @@ async def lifespan(_app):
 app = FastAPI(title="LLMDyno", version=__version__, lifespan=lifespan)
 app.include_router(routes.router, prefix="/api")
 app.include_router(results_api.router, prefix="/api")
+app.include_router(external_api.router, prefix="/api")
 
 
 @app.exception_handler(KeyError)

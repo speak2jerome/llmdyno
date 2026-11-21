@@ -16,11 +16,21 @@ jobs:
   python:
     name: Python ${{ matrix.python }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # Windows on ARM is new on GitHub's runners and some wheels lag behind; report it without blocking merges
+    continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         python: ["3.11", "3.12", "3.13"]
+        include:
+          - os: macos-14            # Apple Silicon (M1)
+            python: "3.12"
+          - os: ubuntu-24.04-arm    # Linux on ARM64
+            python: "3.12"
+          - os: windows-11-arm      # Windows on ARM64
+            python: "3.12"
+            experimental: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,6 +45,8 @@ jobs:
         run: python -m pytest -q
       - name: CLI smoke
         run: llmdyno --version
+      - name: Platform detection
+        run: python scripts/platform_probe.py
 
   frontend:
     name: Web UI

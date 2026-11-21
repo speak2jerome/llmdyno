@@ -9,6 +9,7 @@ import { api, download, qs } from "../api";
 import { Chart, axis } from "../charts";
 import { fmtDur, fmtMib, fmtNum, fmtPct, fmtTokens, fmtUsd } from "../format";
 import { useSample, useSettings } from "../queries";
+import { AAReference, PublicScores } from "./ResultsExternal";
 import {
   Badge, Button, Card, Chip, Drawer, Empty, Field, Menu, Notice, PageHead, ScoreCell, Segmented, Select, Skeleton, Table, Toggle, useToast,
 } from "../ui";
@@ -267,6 +268,9 @@ export default function Results() {
           ]} />
         )}
       </Card>
+
+      <PublicScores configs={configs} runs={runs} name={cname} logo={clogo} ckey={ckey} />
+      <AAReference configs={configs} runs={runs} labels={L} ckey={ckey} />
 
       <div className="grid grid-2 mt-16">
         <Card title="Per-benchmark heatmap" sub="Click a cell to list its runs." actions={<Select value={heatMetric} onChange={setHeatMetric} options={METRICS.filter((m) => m.level.includes("cell")).map((m) => ({ value: m.key, label: m.label }))} aria-label="Heatmap metric" />}>

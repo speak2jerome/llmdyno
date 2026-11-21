@@ -11,6 +11,9 @@ MIB = 2**20
 CACHE_BYTES = {"f32": 4.0, "f16": 2.0, "bf16": 2.0, "q8_0": 34 / 32, "q5_1": 24 / 32, "q5_0": 22 / 32,
                "q4_1": 20 / 32, "q4_0": 18 / 32, "iq4_nl": 18 / 32}
 CUDA_OVERHEAD_MIB = 250          # CUDA context and allocator slack beyond llama.cpp's own buffers (34-276 MiB measured)
+# The same slack for other backends; only CUDA is calibrated, the rest are conservative round numbers.
+DEVICE_OVERHEAD_MIB = {"cuda": CUDA_OVERHEAD_MIB, "metal": 160, "vulkan": 300, "rocm": 300, "sycl": 300,
+                       "openvino": 300, "opencl-adreno": 200, "cpu": 0}
 LOW_BIT = ("IQ1", "IQ2", "Q2_K", "TQ1", "TQ2")
 
 
@@ -82,7 +85,7 @@ def placement(meta, params):
     return gpu_layers, output_gpu, cpu_moe
 
 
-def estimate(meta, params):
+def estimate(meta, params, overhead_mib=CUDA_OVERHEAD_MIB):
     """Projected memory in MiB on the GPU and in host RAM."""
     gpu_layers, output_gpu, cpu_moe = placement(meta, params)
     kv = kv_layers(meta, params)
@@ -111,7 +114,7 @@ def estimate(meta, params):
     rs = recurrent_state_bytes(meta, params)
     comp = compute_bytes(meta, params) if gpu_layers else 0
     gpu = {"weights": w_gpu / MIB, "kv": (kv_gpu + rs) / MIB, "compute": comp / MIB,
-           "overhead": CUDA_OVERHEAD_MIB if gpu_layers else 0}
+           "overhead": overhead_mib if gpu_layers else 0}
     cpu = {"weights": w_cpu / MIB, "kv": kv_cpu / MIB, "compute": (meta["n_vocab"] * 4 * 512 + 96 * MIB) / MIB}
     return {"gpu": {k: round(v) for k, v in gpu.items()}, "gpu_total": round(sum(gpu.values())),
             "cpu": {k: round(v) for k, v in cpu.items()}, "cpu_total": round(sum(cpu.values())),
@@ -120,13 +123,13 @@ def estimate(meta, params):
             "source": "estimate"}
 
 
-def from_fit(fit):
+def from_fit(fit, overhead_mib=CUDA_OVERHEAD_MIB):
     """Turn a llama-fit-params breakdown into the same shape as estimate()."""
     d = fit["devices"][0] if fit.get("devices") else None
     h = fit.get("host") or {}
     if not d:
         return None
-    gpu = {"weights": d["model"], "kv": d["ctx"], "compute": d["compute"], "overhead": CUDA_OVERHEAD_MIB}
+    gpu = {"weights": d["model"], "kv": d["ctx"], "compute": d["compute"], "overhead": overhead_mib}
     cpu = {"weights": h.get("model", 0), "kv": h.get("ctx", 0), "compute": h.get("compute", 0)}
     return {"gpu": gpu, "gpu_total": sum(gpu.values()), "cpu": cpu, "cpu_total": sum(cpu.values()),
             "device": d["dev"], "source": "llama-fit-params", "fitted_ngl": fit.get("fitted_ngl")}
@@ -158,10 +161,13 @@ def check(meta, params, specs, fit=None, os_name="nt", benchmarks=None):
     """Verdict + warnings. `fit` is an optional llama-fit-params result (exact, local files only)."""
     from .system.specs import primary_gpu
 
-    est = estimate(meta, params)
-    exact = from_fit(fit) if fit else None
-    mem = exact or est
     g = primary_gpu(specs)
+    overhead = DEVICE_OVERHEAD_MIB.get((g or {}).get("backend"), CUDA_OVERHEAD_MIB) if g else 0
+    est = estimate(meta, params, overhead)
+    exact = from_fit(fit, overhead) if fit else None
+    mem = exact or est
+    # Apple Silicon (and Snapdragon) GPUs share system RAM: "VRAM" is the share the OS lets the GPU wire down
+    unified = bool(g and g.get("unified"))
     free = (g.get("vram_free_mib") or g.get("vram_total_mib") or 0) if g else 0
     total = (g.get("vram_total_mib") or 0) if g else 0
     ram_avail = specs["memory"]["available_bytes"] / MIB
@@ -173,13 +179,21 @@ def check(meta, params, specs, fit=None, os_name="nt", benchmarks=None):
     ctx = int(params["ctx"])
     ngl_all = params.get("gpu_layers", "all") in ("all", None, -1, 999)
     win = os_name == "nt"
+    gpu_word = "GPU memory" if unified else "VRAM"
 
     if not g:
         verdict = "cpu"
         w.append(warning("danger", "cpu_only", "No usable GPU: the whole model runs on the CPU. Agentic benchmarks with "
                          "tens of thousands of context tokens can take hours per task."))
-        if not specs["cpu"].get("avx2"):
-            w.append(warning("danger", "no_avx2", "This CPU has no AVX2, so CPU inference will be extremely slow."))
+        if not specs["cpu"].get("simd_ok", specs["cpu"].get("avx2")):
+            missing = "NEON dot-product support" if specs["cpu"].get("isa") == "arm64" else "AVX2"
+            w.append(warning("danger", "no_avx2", f"This CPU has no {missing}, so CPU inference will be extremely slow."))
+    elif headroom < 0 and unified:
+        verdict = "oom"
+        w.append(warning("danger", "unified_limit", f"Needs {need_gpu / 1024:.1f} GB of GPU memory but the GPU may use "
+                         f"only {free / 1024:.1f} GB of the unified memory right now. The system would compress and swap "
+                         "memory instead of failing, so decoding would slow to a crawl and the results would mislead.",
+                         fix=_shrink_fix(meta, params, -headroom, unified=True)))
     elif headroom < 0:
         verdict = "spill" if win else "oom"
         if win:
@@ -192,8 +206,10 @@ def check(meta, params, specs, fit=None, os_name="nt", benchmarks=None):
                              "llama-server will fail to allocate (out of memory).", fix=_shrink_fix(meta, params, -headroom)))
     elif headroom < 600:
         verdict = "tight"
-        w.append(warning("warning", "tight", f"Only {headroom:.0f} MiB of VRAM would remain. Browsers, the desktop and other "
-                         "apps also use VRAM, so this can tip into a spill or OOM mid-run.", fix=_shrink_fix(meta, params, 600 - headroom)))
+        w.append(warning("warning", "tight", f"Only {headroom:.0f} MiB of {gpu_word} would remain. Browsers, the desktop and "
+                         f"other apps also use {gpu_word}, so this can tip into a "
+                         f"{'swap' if unified else 'spill or OOM'} mid-run.",
+                         fix=_shrink_fix(meta, params, 600 - headroom, unified=unified)))
     else:
         verdict = "fits"
 
@@ -204,8 +220,15 @@ def check(meta, params, specs, fit=None, os_name="nt", benchmarks=None):
     if g and (mem["cpu"]["weights"] > (meta.get("embd_bytes", 0) / MIB) + 64):
         moved_gb = (mem["cpu"]["weights"] - meta.get("embd_bytes", 0) / MIB) / 1024
         what = "MoE expert weights" if params.get("n_cpu_moe") else "layers"
-        w.append(warning("warning", "cpu_offload", f"{moved_gb:.1f} GB of {what} run on the CPU. Decode speed is then "
-                         "limited by system RAM bandwidth, typically 2-6x slower than fully on the GPU."))
+        if unified:
+            w.append(warning("warning", "cpu_offload", f"{moved_gb:.1f} GB of {what} run on the CPU. With unified memory "
+                             "this saves no memory (it is the same RAM) and only slows decoding; keep everything on the GPU.",
+                             fix={"label": "Run all layers on the GPU", "params": {"gpu_layers": "all", "n_cpu_moe": 0}}))
+        else:
+            w.append(warning("warning", "cpu_offload", f"{moved_gb:.1f} GB of {what} run on the CPU. Decode speed is then "
+                             "limited by system RAM bandwidth, typically 2-6x slower than fully on the GPU."))
+    if unified:
+        need_cpu += need_gpu            # one pool of RAM feeds both
     if need_cpu > ram_avail * 0.9:
         w.append(warning("danger" if need_cpu > ram_total else "warning", "ram",
                          f"Host side needs about {need_cpu / 1024:.1f} GB but only {ram_avail / 1024:.1f} GB RAM is free; "
@@ -254,13 +277,15 @@ def check(meta, params, specs, fit=None, os_name="nt", benchmarks=None):
                          fix={"label": "Use recommended", "params": {"sampling": {"temperature": round(rec["temp"], 2),
                               "top_k": rec.get("top_k"), "top_p": round(rec.get("top_p", 0.95), 2)}}}))
     return {"verdict": verdict, "memory": mem, "estimate": est, "exact": exact, "gpu": g and {"name": g["name"],
-            "total_mib": total, "free_mib": free}, "headroom_mib": round(headroom) if g else None,
+            "total_mib": total, "free_mib": free, "unified": unified, "backend": g.get("backend")},
+            "headroom_mib": round(headroom) if g else None,
             "ram_available_mib": round(ram_avail), "decode_tps_estimate": decode_tps_estimate(meta, params, mem, g),
             "warnings": w}
 
 
-def _shrink_fix(meta, params, need_mib):
-    """Cheapest single change that frees `need_mib`: smaller KV type, smaller context, or MoE offload."""
+def _shrink_fix(meta, params, need_mib, unified=False):
+    """Cheapest single change that frees `need_mib`: smaller KV type, smaller context, or MoE offload (offload frees
+    nothing on unified memory, so there the answer is a smaller context, or no fix and a smaller quant)."""
     need = need_mib * MIB
     kv_now = sum(kv_layers(meta, params))
     if params.get("cache_k") in ("f16", "f32", "bf16", None) or params.get("cache_v") in ("f16", "f32", "bf16", None):
@@ -272,6 +297,8 @@ def _shrink_fix(meta, params, need_mib):
         if c < ctx and kv_now - sum(kv_layers(meta, {**params, "ctx": c})) - (compute_bytes(meta, params) -
                                                                               compute_bytes(meta, {**params, "ctx": c})) * -1 >= need:
             return {"label": f"Reduce context to {c // 1024}k", "params": {"ctx": c}}
+    if unified:
+        return None
     if meta.get("expert_count"):
         acc = 0
         for i, eb in enumerate(meta["expert_bytes"]):

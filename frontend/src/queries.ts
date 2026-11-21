@@ -11,7 +11,7 @@ export const queryClient = new QueryClient({
 export const keys = {
   specs: ["specs"], deps: ["deps"], settings: ["settings"], models: ["models"], profiles: ["profiles"],
   providers: ["providers"], vendors: ["vendors"], harnesses: ["harnesses"], benchmarks: ["benchmarks"], suites: ["suites"],
-  plans: ["plans"], jobs: ["jobs"], sample: ["sample"],
+  plans: ["plans"], jobs: ["jobs"], sample: ["sample"], imports: ["imports"], aa: ["aa"],
 };
 
 export const useSpecs = () => useQuery({ queryKey: keys.specs, queryFn: () => api.get("/system/specs"), staleTime: 30_000 });
@@ -26,6 +26,8 @@ export const useBenchmarks = () => useQuery({ queryKey: keys.benchmarks, queryFn
 export const useSuites = () => useQuery({ queryKey: keys.suites, queryFn: () => api.get<any[]>("/suites") });
 export const usePlans = () => useQuery({ queryKey: keys.plans, queryFn: () => api.get<any[]>("/plans") });
 export const useSample = () => useQuery({ queryKey: keys.sample, queryFn: () => api.get("/sample") });
+export const useImports = () => useQuery({ queryKey: keys.imports, queryFn: () => api.get("/imports") });
+export const useAA = () => useQuery({ queryKey: keys.aa, queryFn: () => api.get("/references/aa") });
 
 /** Invalidate lists when the server reports changes, so every page stays current without polling. */
 export function useLiveInvalidation() {
@@ -40,7 +42,8 @@ export function useLiveInvalidation() {
         const j = m.data;
         if (!j || !["done", "failed", "cancelled"].includes(j.status)) return;
         const byKind: Record<string, string[][]> = {
-          download: [keys.models, keys.deps], install: [keys.deps, keys.specs], build: [keys.harnesses, keys.deps],
+          download: [keys.models, keys.deps], install: [keys.deps, keys.specs, keys.imports],
+          build: [keys.harnesses, keys.deps, keys.imports], import: [keys.benchmarks, keys.suites, keys.imports],
           plan: [keys.plans, ["results"]], judge: [["results"], ["reviews"]], smoke: [keys.profiles], validate: [keys.benchmarks],
         };
         for (const k of byKind[j.kind] || []) qc.invalidateQueries({ queryKey: k });

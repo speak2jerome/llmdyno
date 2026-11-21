@@ -78,6 +78,11 @@ Add an instance to `BUILTIN` at the bottom of the file. `rc` is a `RunCtx` with 
 - **Offline.** The sandbox has no internet. Anything the harness needs at run time must be installed in the image.
 - **Machine-readable output if available** (`--json`, `stream-json`). It ends up in the run's logs; the transcript
   itself comes from the proxy, so it works even for harnesses with plain-text output.
+- **Portable.** For benchmarks with their own image (SWE-bench, polyglot) the harness is installed into
+  `/opt/dyno-rt` on Ubuntu 22.04 (`Harness.runtime_install()`): npm installs go there automatically through
+  `npm_config_prefix`; Python harnesses set `venv = (name, pip spec, [bins])` and get a standalone Python. Keep
+  everything the harness needs at run time inside that prefix, and paths the install writes elsewhere (such as
+  `/opt/xdg-cache`) are rewritten into it. Custom harnesses get the same treatment on a best-effort basis.
 
 ## Testing
 

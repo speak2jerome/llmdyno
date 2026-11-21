@@ -147,7 +147,9 @@ def compute(runs, reviews, weights, quality_weights, efficiency_ref="local", pas
                        "instruction_following": (d["instruction_following"] or 0) * weights.get("instruction_following", 15),
                        "quality": (d["quality"] or 0) * weights.get("quality", 25),
                        "efficiency": (d["efficiency"] or 0) * weights.get("efficiency", 10)}
-        tw = sum(weights.values()) or 1
+        # same weights as the final score: a component with no value (no code-quality score for tasks run in their
+        # own image, say) drops out, so the stacked bar still adds up to the final score
+        tw = sum(weights.get(k, 0) for k in d["points"] if d.get(k) is not None) or 1
         d["points"] = {k: round(v * 100 / tw, 2) for k, v in d["points"].items()}
         cfg_rows.append(d)
     cfg_rows.sort(key=lambda d: -(d["final"] or 0))
