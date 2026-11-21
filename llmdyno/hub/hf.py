@@ -18,8 +18,20 @@ SPLIT_RE = re.compile(r"-(\d{5})-of-(\d{5})\.gguf$", re.I)
 
 
 def _headers():
-    tok = secrets.get("hf_token")
+    tok = secrets.get("hf_token") or _hub_token()
     return {"Authorization": f"Bearer {tok}"} if tok else {}
+
+
+def _hub_token():
+    """The token of `hf auth login` (huggingface_hub), when it is installed and you are logged in."""
+    try:
+        from huggingface_hub import get_token
+    except ImportError:
+        return None
+    try:
+        return get_token()
+    except Exception:  # noqa: BLE001 - an unreadable token file must not break downloads
+        return None
 
 
 def search(q, limit=30, sort="downloads"):

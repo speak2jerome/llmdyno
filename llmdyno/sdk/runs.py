@@ -6,7 +6,6 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
-from ..errors import LLMDynoError
 from ._core import Handle, Job, call, covers
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -79,19 +78,24 @@ class Transcript(list):
             tot["wall_s"] += resp.get("wall_s") or 0
         return tot
 
-    def to_pandas(self):
-        """One row per model call (turns()) as a pandas DataFrame, with usage spread into columns."""
-        try:
-            import pandas as pd
-        except ImportError as e:
-            raise LLMDynoError("to_pandas() needs pandas: pip install pandas") from e
+    def _turn_rows(self) -> list:
         rows = []
         for t in self.turns():
             row = {k: t[k] for k in ("seq", "finish", "ttft_s", "wall_s", "cost_usd", "t")}
             row.update({f"tokens_{k}": v for k, v in (t["usage"] or {}).items()})
             row["tool_calls"] = sum(1 for b in t["blocks"] if b.get("type") == "tool_call")
             rows.append(row)
-        return pd.DataFrame(rows)
+        return rows
+
+    def to_pandas(self):
+        """One row per model call (turns()) as a pandas DataFrame, with usage spread into columns."""
+        from ..integrations.data import frame
+        return frame(self._turn_rows(), "pandas")
+
+    def to_polars(self):
+        """turns() as a polars DataFrame; needs "llmdyno[data]"."""
+        from ..integrations.data import frame
+        return frame(self._turn_rows(), "polars")
 
     def __repr__(self):
         u = self.usage()
@@ -192,6 +196,10 @@ class Run(Handle):
             return job
         job.wait(quiet=quiet)
         return self.refresh()
+
+    def _repr_html_(self):
+        from ..integrations.notebook import run_html
+        return run_html(self.to_dict())
 
     def __repr__(self):
         d = self._d or {}

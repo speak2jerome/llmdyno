@@ -35,7 +35,7 @@ def bench(models: Union[Profile, str, Sequence[Union[Profile, str]]],
           iterations: int = 1, name: str | None = None, budget_usd: float | None = None, quality: bool = True,
           timeout_multiplier: float | None = None, cloud_concurrency: int | None = None, allow_spill: bool = False,
           acknowledge_risks: bool = False, wait: bool = True, quiet: bool = False,
-          on_event=None) -> Union["Results", "Plan"]:
+          on_event=None, auto_log=None) -> Union["Results", "Plan"]:
     """Run models × harnesses × benchmarks × iterations and return the scored Results.
 
     models: Profiles (from cloud_model / local_model) or profile names. benchmarks: benchmark or suite ids
@@ -43,7 +43,8 @@ def bench(models: Union[Profile, str, Sequence[Union[Profile, str]]],
     budget_usd caps this plan's cloud spend on top of each provider's own cap. Local models share the GPU one at a time;
     cloud runs go in parallel. The plan is checked first and PreflightError lists anything that blocks it; danger
     warnings (spill, out of memory, …) need acknowledge_risks=True. wait=False returns the running Plan instead;
-    on_event(ev) gets every live Event while it runs (see watch())."""
+    on_event(ev) gets every live Event while it runs (see watch()). auto_log sends the results on when the plan
+    finishes: "mlflow", "wandb", "langfuse", "otel", a list of them, or {"mlflow": {"experiment": "x"}, …}."""
     options = {"budget_usd": budget_usd, "quality": quality, "timeout_multiplier": timeout_multiplier,
                "cloud_concurrency": cloud_concurrency, "allow_spill": allow_spill or None}
     body = _plan_body(models, benchmarks, harnesses, iterations, name, options)
@@ -61,7 +62,13 @@ def bench(models: Union[Profile, str, Sequence[Union[Profile, str]]],
                 + (f", about ${est['cost_usd']:.2f} in API costs" if est.get("cost_usd") else ""))
     created = call("plans.create_plan", body={**body, "start": True, "acknowledge_risks": acknowledge_risks})
     p = Plan(created["plan_id"], created.get("job_id"))
-    return p.wait(quiet=quiet, on_event=on_event) if wait else p
+    if not wait:
+        return p
+    res = p.wait(quiet=quiet, on_event=on_event)
+    if auto_log:
+        from ..integrations.tracking import auto_log as send
+        send(res, auto_log)
+    return res
 
 
 class Plan(Handle):
@@ -128,19 +135,24 @@ class Plan(Handle):
         d = self._get()
         return f"<llmdyno.Plan {d['name']!r} {d['status']} {d.get('counts')}>"
 
-    def wait(self, quiet: bool = False, on_event=None, transcript: bool = False) -> "Results":
+    def wait(self, quiet: bool = False, on_event=None, transcript: bool = False, progress: bool | None = None) -> "Results":
         """Block until the plan stops, printing each run as it finishes, then return its Results. on_event(ev) is
-        called for every live Event (see watch(); transcript=True adds agent events). Ctrl+C cancels the plan."""
+        called for every live Event (see watch(); transcript=True adds agent events). progress shows a tqdm bar
+        (default: when tqdm is installed and the output is a terminal or notebook). Ctrl+C cancels the plan."""
         from .live import RUN_FINISHED, watch
         labels = _labels()
         printed: dict[str, str] = {}
+        bar = _progress(self, quiet, progress)
+        say = (lambda q, msg: bar.write(msg)) if bar is not None else _say
         try:
             for ev in watch(self, transcript=transcript, gpu=on_event is not None):
                 if on_event is not None:
                     on_event(ev)
                 if ev.kind == "run" and ev.status in RUN_FINISHED and printed.get(ev.run_id) != ev.status:
                     printed[ev.run_id] = ev.status          # a finished run can be updated again (quality scores)
-                    _say(quiet, "  " + _run_line(ev.data, labels))
+                    say(quiet, "  " + _run_line(ev.data, labels))
+                    if bar is not None:
+                        bar.update(1)
         except KeyboardInterrupt:
             _say(quiet, "  cancelling the plan (finished runs are kept) …")
             call("plans.cancel_plan", pid=self.id)
@@ -148,6 +160,9 @@ class Plan(Handle):
             if job:
                 Job(job)._drain()
             raise
+        finally:
+            if bar is not None:
+                bar.close()
         d = self._get()
         _say(quiet, f"Plan {d['status']}: {d.get('counts')}")
         return self.results()
@@ -182,6 +197,16 @@ class Plan(Handle):
         from .ui import _open_ui
         return _open_ui(f"/plans/{self.id}")
 
+    def live(self):
+        """A Jupyter widget that follows the plan as it runs (progress, finished runs, GPU); needs
+        "llmdyno[notebook]". Display it as the last expression of a cell."""
+        from ..integrations.notebook import LivePanel
+        return LivePanel(self)
+
+    def _repr_html_(self):
+        from ..integrations.notebook import plan_html
+        return plan_html(self._get())
+
 
 @covers("GET /api/plans")
 def list_plans() -> list:
@@ -192,6 +217,23 @@ def list_plans() -> list:
 def plan(plan_id: str) -> Plan:
     """A plan by id."""
     return Plan(plan_id).refresh()
+
+
+def _progress(plan, quiet, progress):
+    """A tqdm bar over the plan's runs when wanted and available."""
+    import sys
+    if quiet or progress is False:
+        return None
+    if progress is None:
+        interactive = hasattr(sys.stdout, "isatty") and sys.stdout.isatty() or "ipykernel" in sys.modules
+        if not interactive:
+            return None
+    from ..integrations.notebook import progress_bar
+    d = plan._get()
+    bar = progress_bar(len(d.get("runs") or []), d.get("name") or plan.id)
+    if bar is not None:
+        bar.update(sum(1 for r in d.get("runs") or [] if r["status"] in ("done", "failed", "cancelled", "skipped")))
+    return bar
 
 
 def _labels() -> dict:

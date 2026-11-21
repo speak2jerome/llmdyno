@@ -167,7 +167,7 @@ def preflight(plan_spec):
             for b in bl:
                 row["minutes"] += (b.get("expected_minutes") or {}).get("local", 5) * factor * iters * n_h if model else 0
         else:
-            key_ok = bool(prov) and (prov["vendor"] == "custom" or secrets.has(providers.secret_name(prov["id"])))
+            key_ok = bool(prov) and (prov["vendor"] in providers.KEYLESS or secrets.has(providers.secret_name(prov["id"])))
             if not key_ok:
                 block.append({"level": "danger", "text": f"{prof['name']}: no API key for {prov['name'] if prov else 'its provider'}."})
             price = prof.get("pricing") or {}

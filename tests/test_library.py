@@ -124,7 +124,7 @@ def test_results_from_the_bundled_sample(tmp_path):
         assert r.to_json()["leaderboard"][0]["profile"] == lb[0]["profile"]
         heavy = llmdyno.results("plan_sample_round1", correctness=100, instruction_following=0, quality=0, efficiency=0)
         assert heavy.leaderboard()[0]["final"] == heavy.leaderboard()[0]["correctness"]
-        assert "<table>" in r._repr_html_()
+        assert "<table" in r._repr_html_() and "llmdyno-bar" in r._repr_html_()
         p = llmdyno.plan("plan_sample_round1")
         assert p.status == "done" and len(p.runs()) == 75
         assert len(p.results().leaderboard()) == 15                  # a single Plan, not a list of them
@@ -138,7 +138,7 @@ def test_sdk_modules_only_reach_llmdyno_through_the_backend():
     """SDK code talks to services via call(), so the same objects work against a remote LLMDyno (0.6)."""
     import ast
     import pathlib
-    allowed = {"errors", "__version__"}
+    allowed = {"errors", "__version__", "integrations"}
     local_only = {"_backend.py": {"config", "db", "events", "inference"}, "_core.py": {"config"}, "ui.py": {"config"},
                   "parity.py": {"sdk", "server"}}           # parity reads the local route table
     sdk = pathlib.Path(llmdyno.__file__).parent / "sdk"
@@ -224,3 +224,16 @@ def test_aio_watch_and_calls():
         return kinds, suites
     kinds, suites = asyncio.run(main())
     assert kinds[-1] == "job" and any(s["id"] == "suite_quick" for s in suites)
+
+
+def test_integrations_only_use_the_public_library():
+    """Integrations are client-side: they reach LLMDyno through the SDK, so they work against a remote one too."""
+    import ast
+    import pathlib
+    folder = pathlib.Path(llmdyno.__file__).parent / "integrations"
+    for f in folder.glob("*.py"):
+        for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom) and node.level >= 2:
+                names = {node.module.split(".")[0]} if node.module else {a.name for a in node.names}
+                extra = names - {"sdk", "errors", "__version__", "lib"}
+                assert not extra, f"integrations/{f.name} imports {extra}"

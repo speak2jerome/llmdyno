@@ -86,7 +86,7 @@ def del_provider_key(pid: str):
 def test_provider(pid: str):
     p = _get(db.Provider, pid)
     key = secrets.get(providers.secret_name(pid))
-    if not key and p["vendor"] != "custom":
+    if not key and p["vendor"] not in providers.KEYLESS:
         raise errors.http(400, "add an API key first")
     try:
         res = providers.list_models(p["base_url"], p["api_style"], key)
@@ -118,6 +118,11 @@ def delete_provider(pid: str):
         s.commit()
     secrets.delete(providers.secret_name(pid))
     return {"ok": True}
+
+
+def local_servers():
+    """OpenAI-compatible servers running on this machine (Ollama, LM Studio, vLLM, SGLang, llama.cpp, LiteLLM)."""
+    return providers.probe_local_servers()
 
 
 def pricing_lookup(vendor: str, model: str):

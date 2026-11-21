@@ -57,12 +57,59 @@ VENDORS = [
      "styles": {"openai-chat": "https://api.fireworks.ai/inference/v1"}, "keys_url": "https://fireworks.ai/account/api-keys"},
     {"id": "cerebras", "name": "Cerebras", "base_url": "https://api.cerebras.ai/v1", "api_style": "openai-chat",
      "styles": {"openai-chat": "https://api.cerebras.ai/v1"}, "keys_url": "https://cloud.cerebras.ai/"},
+    {"id": "litellm", "name": "LiteLLM proxy", "base_url": "http://host.docker.internal:4000/v1", "api_style": "openai-chat",
+     "styles": {"openai-chat": "", "openai-responses": "", "anthropic": ""}, "key_optional": True,
+     "keys_url": "https://docs.litellm.ai/docs/proxy/quick_start",
+     "notes": "Run `litellm --model bedrock/... ` (or a config) on this machine: Azure OpenAI, Bedrock, Vertex AI and "
+              "100+ providers behind one OpenAI-compatible endpoint. The key is the proxy's master key, if it has one. "
+              "Prices come from LiteLLM's own table when the litellm package is installed."},
     {"id": "custom", "name": "Custom OpenAI-compatible", "base_url": "http://host.docker.internal:11434/v1",
-     "api_style": "openai-chat", "styles": {"openai-chat": "", "openai-responses": "", "anthropic": ""},
+     "api_style": "openai-chat", "styles": {"openai-chat": "", "openai-responses": "", "anthropic": ""}, "key_optional": True,
      "keys_url": "", "notes": "Ollama (:11434/v1), LM Studio (:1234/v1), vLLM or SGLang (:8000/v1), or any gateway. "
                               "Use host.docker.internal to reach a server on this machine from the sandbox proxy."},
 ]
 BY_ID = {v["id"]: v for v in VENDORS}
+# vendors whose endpoint may run without a key (a local server, a LiteLLM proxy without a master key)
+KEYLESS = {v["id"] for v in VENDORS if v.get("key_optional")}
+# OpenAI-compatible servers people run on their own machine, by their usual port
+LOCAL_SERVERS = [("ollama", "Ollama", 11434), ("lmstudio", "LM Studio", 1234), ("vllm", "vLLM", 8000),
+                 ("sglang", "SGLang", 30000), ("llamacpp", "llama.cpp server", 8080), ("litellm", "LiteLLM proxy", 4000)]
+
+
+def probe_local_servers(timeout=0.5):
+    """Which OpenAI-compatible servers answer on this machine, with their models. Ports are checked in parallel."""
+    import concurrent.futures
+
+    def probe(entry):
+        sid, name, port = entry
+        url = f"http://127.0.0.1:{port}/v1"
+        try:
+            r = httpx.get(f"{url}/models", timeout=timeout)
+            data = r.json() if r.status_code == 200 else None
+        except (httpx.HTTPError, ValueError):
+            return None
+        if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+            return None
+        return {"id": sid, "name": name, "port": port, "url": url,
+                "docker_url": f"http://host.docker.internal:{port}/v1",
+                "models": sorted(m.get("id") for m in data["data"] if isinstance(m, dict) and m.get("id"))}
+    with concurrent.futures.ThreadPoolExecutor(len(LOCAL_SERVERS)) as pool:
+        return [x for x in pool.map(probe, LOCAL_SERVERS) if x]
+
+
+def litellm_price(model_id):
+    """Price per 1M tokens from LiteLLM's own table (when the litellm package is installed)."""
+    try:
+        import litellm
+    except ImportError:
+        return None
+    c = litellm.model_cost.get(model_id) or litellm.model_cost.get(model_id.split("/", 1)[-1])
+    if not c or not c.get("input_cost_per_token"):
+        return None
+    per_m = lambda v: None if v is None else round(v * 1e6, 6)   # noqa: E731
+    return {"id": model_id, "name": model_id, "context": c.get("max_input_tokens"),
+            "input": per_m(c.get("input_cost_per_token")), "output": per_m(c.get("output_cost_per_token")),
+            "cached": per_m(c.get("cache_read_input_token_cost")), "source": "litellm", "match": "exact"}
 
 
 def secret_name(provider_id):
@@ -130,7 +177,13 @@ def _norm(s):
 
 
 def lookup_price(vendor_id, model_id):
-    """Best match in the OpenRouter catalog: exact '<prefix>/<model>', then normalised equality, then prefix."""
+    """Best match in the OpenRouter catalog: exact '<prefix>/<model>', then normalised equality, then prefix.
+    LiteLLM models ("bedrock/anthropic.claude-…") use LiteLLM's own price table first."""
+    if vendor_id == "litellm":
+        hit = litellm_price(model_id)
+        if hit:
+            return hit
+        model_id = model_id.split("/")[-1]
     try:
         cat = openrouter_catalog()
     except (httpx.HTTPError, OSError, ValueError):

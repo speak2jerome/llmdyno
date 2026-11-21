@@ -196,6 +196,11 @@ def list_vendors():
     return svc_providers.list_vendors()
 
 
+@router.get("/providers/local-servers")
+def local_servers():
+    return svc_providers.local_servers()
+
+
 @router.get("/providers")
 def list_providers():
     return svc_providers.list_providers()

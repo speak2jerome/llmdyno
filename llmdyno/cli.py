@@ -23,14 +23,15 @@ import webbrowser
 from pathlib import Path
 
 # hand-written commands (unchanged from before the generated CLI)
-CUSTOM = ("serve", "doctor", "specs")
+CUSTOM = ("serve", "doctor", "specs", "ci")
 # library classes whose methods become `llmdyno <group> <method> ID ...`, with the function that finds one by id
 GROUPS = {"Profile": ("profile", "profile"), "Model": ("model", "model"), "Provider": ("provider", "provider"),
           "Harness": ("harness", "harness"), "Benchmark": ("benchmark", "benchmark"), "Suite": ("suite", "suite"),
           "Plan": ("plan", "plan"), "Run": ("run", "run"), "Job": ("job", "job")}
 GETTERS = {g for _, g in GROUPS.values()}
 GETTER_OF = {group: getter for group, getter in GROUPS.values()}
-NOT_COMMANDS = {"init"}                                   # --data DIR instead
+NOT_COMMANDS = {"init",                                   # --data DIR instead
+                "inspect_task", "import_inspect_samples"}     # take or return Python objects (Inspect tasks, datasets)
 SKIP_METHODS = {"refresh", "to_dict", "get"}
 NO_CLI_PARAMS = {"on_event", "_stop", "quiet"}            # callbacks, internals; quiet follows --json
 PLURALS = {"plans", "benchmarks", "harnesses", "models", "runs", "judges", "languages", "instance_ids", "statuses",
@@ -135,6 +136,16 @@ def build_parser():
     sv.add_argument("--open", action="store_true", help="open the browser")
     sub.add_parser("doctor", parents=[common], help="check system specs and dependencies")
     sub.add_parser("specs", parents=[common], help="print detected hardware as JSON")
+    ci = sub.add_parser("ci", parents=[common], help="fail (exit 1) when scores dropped against a baseline",
+                        description="Compare results with a baseline for CI: exit 1 when a configuration's score "
+                                    "dropped by more than --max-drop points or is missing.")
+    ci.add_argument("--baseline", required=True, help="results JSON to compare with (llmdyno results --json)")
+    ci.add_argument("--plans", nargs="+", default=None, help="plans to check (default: every plan)")
+    ci.add_argument("--results", default=None, metavar="FILE", help="a results JSON instead of --plans")
+    ci.add_argument("--metric", default="final", help="final, correctness, quality, … (0-100)")
+    ci.add_argument("--max-drop", type=float, default=2.0, help="allowed drop in points (default 2)")
+    ci.add_argument("--allow-missing", action="store_true", help="a configuration missing from the results is fine")
+    ci.add_argument("--save", default=None, metavar="FILE", help="also save the current results there (next baseline)")
 
     groups = {}
     for name in lib.__all__:
@@ -296,6 +307,27 @@ def _doctor(a):
     return 0
 
 
+def _ci(a):
+    from . import lib
+    current = a.results or lib.results(a.plans)
+    if a.save and not a.results:
+        current.to_json(a.save)
+    rep = lib.compare_results(current, a.baseline, metric=a.metric, max_drop=a.max_drop, allow_missing=a.allow_missing)
+    if a.json:
+        print(json.dumps(rep, indent=2, default=str))
+        return 0 if rep["ok"] else 1
+    fmt = lambda v: "–" if v is None else f"{v:.1f}"   # noqa: E731
+    for r in rep["rows"]:
+        flag = "REGRESSED" if r in rep["regressions"] else "missing" if r in rep["missing"] else \
+            "new" if r in rep["new"] else "ok"
+        change = "" if r["change"] is None else f" ({r['change']:+.1f})"
+        print(f"{flag:<10} {r['profile']} · {r['harness']}: {fmt(r['baseline'])} -> {fmt(r['current'])}{change}")
+    verdict = "passed" if rep["ok"] else "FAILED"
+    print(f"\n{verdict}: {len(rep['regressions'])} regression(s) of more than {a.max_drop} {a.metric} points, "
+          f"{len(rep['missing'])} missing")
+    return 0 if rep["ok"] else 1
+
+
 def main(argv=None) -> int:
     ap, registry = build_parser()
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -308,6 +340,12 @@ def main(argv=None) -> int:
         return _serve(a)
     if a.cmd == "doctor":
         return _doctor(a)
+    if a.cmd == "ci":
+        try:
+            return _ci(a)
+        except LLMDynoError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
     if a.cmd == "specs":
         print(json.dumps(lib.specs(refresh=True), indent=2, default=str))
         return 0

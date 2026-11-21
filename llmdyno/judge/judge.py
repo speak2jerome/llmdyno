@@ -136,7 +136,7 @@ def family_of(prof, model=None, prov=None):
                 return vendor
         return arch or "local"
     vendor = (prov or {}).get("vendor")
-    if vendor in ("openrouter", "groq", "together", "fireworks", "cerebras", "custom", None):
+    if vendor in ("openrouter", "groq", "together", "fireworks", "cerebras", "custom", "litellm", None):
         rm = (prof.get("remote_model") or "").lower()       # hosts serve other vendors' models: use the model id
         for key, v in [*ARCH_VENDOR, ("gpt", "openai"), ("o3", "openai"), ("o4", "openai"), ("claude", "anthropic"),
                        ("gemini", "google")]:

@@ -1,0 +1,36 @@
+# Fail a pull request when a model, prompt or harness change makes your coding agent worse.
+#
+# Copy to .github/workflows/ in your repository. Benchmarks run agents in Docker and local models on a GPU, so this
+# uses a self-hosted runner with Docker (and a GPU for local models); cloud models only need Docker and an API key.
+# Keep a baseline (llmdyno results --json from a good run) in the repository and refresh it when a drop is intended.
+name: Agent regression check
+
+on:
+  pull_request:
+
+jobs:
+  llmdyno:
+    runs-on: [self-hosted, docker]          # add "gpu" for local models
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install LLMDyno
+        run: pip install llmdyno
+      - name: Set up images (cached across runs on a self-hosted runner)
+        run: llmdyno setup --harnesses pi
+      - name: Run the benchmarks
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          llmdyno cloud-model anthropic claude-sonnet-5-5 --name "CI model" --budget-usd 2 --set reasoning_effort=low
+          llmdyno bench "CI model" --benchmarks suite_quick --harnesses pi --name "PR ${{ github.event.number }}" --json > bench.json
+      - name: Compare with the baseline
+        run: llmdyno ci --baseline .llmdyno/baseline.json --plans $(python -c "import json; print(json.load(open('bench.json'))['plans'][0])") --max-drop 2 --save current.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: llmdyno-results
+          path: current.json

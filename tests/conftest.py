@@ -102,3 +102,57 @@ def write_gguf(path, n_layer=2, n_embd=64, n_head=4, n_vocab=32, ctx=4096, name=
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_bytes(head + data)
     return Path(path)
+
+
+def transcript_events(t0):
+    """A two-call transcript the way the proxy records it: a tool call, its result, then a final answer."""
+    import json as _json
+    tool = {"type": "tool_call", "id": "call_1", "name": "bash", "args": _json.dumps({"command": "ls"})}
+    return [
+        {"t": t0, "seq": 1, "ev": "request", "conv": "c1", "model": "local-model", "n_messages": 1,
+         "new": [{"role": "user", "blocks": [{"type": "text", "text": "Write hello.py"}]}]},
+        {"t": t0 + 1, "seq": 1, "ev": "block_start", "index": "think", "type": "thinking"},
+        {"t": t0 + 1, "seq": 1, "ev": "delta", "index": "think", "text": "Let me look"},
+        {"t": t0 + 2, "seq": 1, "ev": "response", "status": 200, "finish": "tool_calls",
+         "blocks": [{"type": "thinking", "text": "Let me look"}, tool],
+         "usage": {"input": 100, "cached": 0, "output": 20, "reasoning": 0}, "ttft_s": 0.5, "wall_s": 2.0,
+         "cost_usd": 0.001},
+        {"t": t0 + 3, "seq": 2, "ev": "request", "conv": "c1", "model": "local-model", "n_messages": 3,
+         "new": [{"role": "assistant", "blocks": [tool]},
+                 {"role": "tool", "blocks": [{"type": "tool_result", "id": "call_1", "name": "bash", "text": "README.md"}]}]},
+        {"t": t0 + 5, "seq": 2, "ev": "response", "status": 200, "finish": "stop",
+         "blocks": [{"type": "text", "text": "Done: hello.py prints hi."}],
+         "usage": {"input": 150, "cached": 100, "output": 30, "reasoning": 0}, "ttft_s": 0.4, "wall_s": 1.5,
+         "cost_usd": 0.002},
+    ]
+
+
+def write_finished_run(plan_id, run_id, profile_id, t0, benchmark_id="t0_smoke_cli"):
+    """A finished plan with one run on disk, as the runner leaves it: workspace, transcript, proxy log, stage log,
+    GPU samples. No Docker or model needed."""
+    import json as _json
+
+    from llmdyno import config
+    plan_dir = config.path("runs_dir") / plan_id
+    run_dir = plan_dir / run_id
+    (run_dir / "workspace").mkdir(parents=True)
+    (run_dir / "workspace" / "hello.py").write_bytes(b"print('hi')\n")
+    (run_dir / "workspace" / "data.bin").write_bytes(b"\0\1" * 50)
+    (run_dir / "transcript.jsonl").write_text("".join(_json.dumps(e) + "\n" for e in transcript_events(t0)))
+    proxy = [{"seq": 1, "ts": t0, "t_end": t0 + 2, "wall_s": 2.0, "ttft_s": 0.5, "finish_reason": "tool_calls",
+              "usage_norm": {"input": 100, "cached": 0, "output": 20}, "cost_usd": 0.001, "model": "local-model"},
+             {"seq": 2, "ts": t0 + 3, "t_end": t0 + 5, "wall_s": 1.5, "ttft_s": 0.4, "finish_reason": "stop",
+              "usage_norm": {"input": 150, "cached": 100, "output": 30}, "cost_usd": 0.002, "model": "local-model"}]
+    (run_dir / "proxy.jsonl").write_text("".join(_json.dumps(x) + "\n" for x in proxy))
+    (run_dir / "stdout_stage1.log").write_bytes(b"agent says hello\n")
+    (plan_dir / f"gpu_{profile_id}.jsonl").write_text(_json.dumps({"ts": t0 + 1, "util": 90, "vram_used_mib": 9000}) + "\n")
+    with db.Session() as s:
+        s.add(db.Plan(id=plan_id, name=f"Test plan {plan_id}", profile_ids=[profile_id], harness_ids=["pi"],
+                      benchmark_ids=[benchmark_id], iterations=1, options={}, status="done", created_at=t0,
+                      started_at=t0, ended_at=t0 + 60))
+        s.add(db.Run(id=run_id, plan_id=plan_id, profile_id=profile_id, harness_id="pi", benchmark_id=benchmark_id,
+                     iteration=1, status="done", dir=str(run_dir), started_at=t0, ended_at=t0 + 60, correctness=1.0,
+                     instruction_following=1.0, wall_s=60, cost_usd=0.003,
+                     metrics={"tests_passed": 3, "tests_total": 3, "generated_tokens": 50}))
+        s.commit()
+    return run_dir

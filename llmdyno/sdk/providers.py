@@ -3,10 +3,14 @@ from __future__ import annotations
 
 from typing import Union
 
-from ..errors import ConflictError, NotFoundError
+import os
+import re
+
+from ..errors import ConflictError, LLMDynoError, NotFoundError
 from ._core import Handle, call, covers
 
-__all__ = ["Provider", "list_providers", "provider", "add_provider", "vendors", "lookup_price"]
+__all__ = ["Provider", "list_providers", "provider", "add_provider", "vendors", "lookup_price", "local_servers",
+           "ollama_model", "openai_compatible", "litellm_model"]
 
 
 class Provider(Handle):
@@ -134,3 +138,62 @@ def lookup_price(vendor: str, model: str) -> dict | None:
     """Price per 1M tokens ({"input", "output", "cached"}, plus context length and the matched model) from
     OpenRouter's catalog, or None when the model is not found."""
     return call("providers.pricing_lookup", vendor=vendor, model=model)["match"]
+
+
+# ------------------------------------------------------------------ servers on your own machine, gateways
+@covers("GET /api/providers/local-servers")
+def local_servers() -> list:
+    """OpenAI-compatible servers running on the machine LLMDyno runs on (Ollama, LM Studio, vLLM, SGLang, a
+    llama.cpp server, a LiteLLM proxy), each with its URL, the URL the sandbox uses, and its models."""
+    return call("providers.local_servers")
+
+
+def _docker_url(url: str) -> str:
+    """The sandbox proxy reaches this machine's servers through host.docker.internal."""
+    return re.sub(r"//(localhost|127\.0\.0\.1|0\.0\.0\.0)(?=[:/])", "//host.docker.internal", url.rstrip("/"))
+
+
+def ollama_model(model: str, *, name: str | None = None, **params):
+    """A model served by Ollama on this machine, as a profile: ollama_model("qwen3-coder:30b", ctx=65536).
+    Ollama must be running (it is found on its usual port, 11434)."""
+    from .profiles import cloud_model
+    server = next((s for s in local_servers() if s["id"] == "ollama"), None)
+    if server is None:
+        raise LLMDynoError("Ollama is not running on this machine (nothing answers on port 11434); start it first")
+    if model not in server["models"]:
+        raise NotFoundError(f"Ollama has no {model!r}; it has: {', '.join(server['models']) or 'no models'} "
+                            f"(ollama pull {model})")
+    return cloud_model("custom", model, base_url=server["docker_url"], name=name or f"{model} · Ollama",
+                       pricing=None, **params)
+
+
+def openai_compatible(base_url: str, model: str | None = None, *, api_key: str | None = None, name: str | None = None,
+                      api_style: str | None = None, **params):
+    """Any OpenAI-compatible endpoint as a profile: LM Studio, vLLM, SGLang, a llama.cpp server, a gateway.
+    localhost URLs are rewritten so the sandbox can reach them. Without model=, the endpoint must serve exactly one
+    (it is looked up among local_servers())."""
+    from .profiles import cloud_model
+    url = _docker_url(base_url)
+    if model is None:
+        hit = next((s for s in local_servers() if s["docker_url"] == url), None)
+        models = hit["models"] if hit else []
+        if len(models) != 1:
+            raise LLMDynoError(f"pass model=; {base_url} serves {', '.join(models) or 'nothing LLMDyno can see'}")
+        model = models[0]
+    return cloud_model("custom", model, base_url=url, api_key=api_key, api_style=api_style,
+                       name=name or f"{model} · {re.sub(r'^https?://', '', base_url).rstrip('/')}", pricing=None,
+                       **params)
+
+
+def litellm_model(model: str, *, base_url: str | None = None, api_key: str | None = None, name: str | None = None,
+                  budget_usd: float | None = None, pricing="auto", **params):
+    """A model behind a LiteLLM proxy (Azure OpenAI, Bedrock, Vertex AI, … through one OpenAI-compatible endpoint):
+    litellm_model("bedrock/anthropic.claude-sonnet-4-5", reasoning_effort="low"). Start the proxy yourself, e.g.
+    `litellm --model bedrock/...` or `litellm --config config.yaml` (pip install "litellm[proxy]"); base_url defaults
+    to it on this machine's port 4000. Prices come from LiteLLM's table when the litellm package is installed
+    ("llmdyno[litellm]"); budgets cap spend as for any cloud provider."""
+    from .profiles import cloud_model
+    key = api_key or os.environ.get("LITELLM_API_KEY") or os.environ.get("LITELLM_MASTER_KEY")
+    return cloud_model("litellm", model, base_url=_docker_url(base_url) if base_url else None, api_key=key,
+                       name=name or f"{model} · LiteLLM", budget_usd=budget_usd, pricing=pricing, **params)
+

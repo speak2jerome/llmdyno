@@ -20,8 +20,10 @@ from .errors import (
     ConflictError, ForbiddenError, InsufficientStorageError, InvalidError, LLMDynoError, NotFoundError, PreflightError,
     RateLimitError, RiskNotAcknowledgedError, UpstreamError,
 )
+from .sdk import agents as _agents
 from .sdk import benchmarks as _benchmarks
 from .sdk import harnesses as _harnesses
+from .sdk import interop as _interop
 from .sdk import judging as _judging
 from .sdk import live as _live
 from .sdk import models as _models
@@ -35,8 +37,10 @@ from .sdk import settings as _settings
 from .sdk import system as _system
 from .sdk import ui as _ui
 from .sdk._core import Job, data_dir, init, job
+from .sdk.agents import *  # noqa: F401,F403
 from .sdk.benchmarks import *  # noqa: F401,F403
 from .sdk.harnesses import *  # noqa: F401,F403
+from .sdk.interop import *  # noqa: F401,F403
 from .sdk.judging import *  # noqa: F401,F403
 from .sdk.live import *  # noqa: F401,F403
 from .sdk.models import *  # noqa: F401,F403
@@ -51,8 +55,8 @@ from .sdk.settings import *  # noqa: F401,F403
 from .sdk.system import *  # noqa: F401,F403
 from .sdk.ui import *  # noqa: F401,F403
 
-_AREAS = (_system, _profiles, _models, _providers, _harnesses, _benchmarks, _plans, _runs, _results, _judging,
-          _references, _settings, _live, _ui)
+_AREAS = (_system, _profiles, _models, _providers, _harnesses, _agents, _benchmarks, _plans, _runs, _results, _judging,
+          _references, _settings, _live, _interop, _ui)
 
 __all__ = ["LLMDynoError", "InvalidError", "ForbiddenError", "NotFoundError", "ConflictError", "RiskNotAcknowledgedError",
            "RateLimitError", "UpstreamError", "InsufficientStorageError", "PreflightError", "Job", "job", "init",

@@ -7,10 +7,10 @@ import json
 from pathlib import Path
 from typing import Sequence, Union
 
-from ..errors import LLMDynoError
 from ._core import _as_list, _id, call, covers
 
-__all__ = ["Results", "results", "save_weights", "sample_status", "load_sample", "unload_sample"]
+__all__ = ["Results", "results", "save_weights", "sample_status", "load_sample", "unload_sample",
+           "load_results_from_hub"]
 
 @covers("GET /api/results")
 def results(plans=None, *, include_sample: bool = False, correctness: float | None = None,
@@ -147,13 +147,80 @@ class Results:
         return lb[0] if lb else None
 
     # -- export
+    LEVELS = ("configs", "runs", "cells", "reviews", "rubric", "public")
+
+    def rows(self, level: str = "configs") -> list:
+        """The rows of one table: configs (the leaderboard), runs, cells, reviews, rubric or public."""
+        views = {"configs": self.leaderboard, "runs": self.runs, "cells": self.cells, "reviews": self.reviews,
+                 "rubric": self.rubric, "public": self.public}
+        if level not in views:
+            raise ValueError(f"level is one of {', '.join(views)}, not {level!r}")
+        return views[level]()
+
     def to_pandas(self, level: str = "configs"):
-        """A pandas DataFrame of the leaderboard (level="configs") or every run (level="runs")."""
-        try:
-            import pandas as pd
-        except ImportError as e:
-            raise LLMDynoError("to_pandas() needs pandas: pip install pandas") from e
-        return pd.DataFrame(self.leaderboard() if level == "configs" else self.runs())
+        """A pandas DataFrame of one table (see rows()): the leaderboard by default."""
+        from ..integrations.data import frame
+        return frame(self.rows(level), "pandas")
+
+    def to_polars(self, level: str = "configs"):
+        """A polars DataFrame of one table (see rows()); needs "llmdyno[data]"."""
+        from ..integrations.data import frame
+        return frame(self.rows(level), "polars")
+
+    def to_parquet(self, path: Union[str, Path], level: str = "runs") -> Path:
+        """Write one table to a Parquet file; needs "llmdyno[data]"."""
+        from ..integrations.data import to_parquet
+        return to_parquet(self.rows(level), path)
+
+    # -- tracking and tracing
+    def log_to_mlflow(self, experiment: str = "llmdyno", tracking_uri: str | None = None,
+                      transcripts: bool = True) -> list:
+        """One MLflow run per configuration: settings as params, scores as metrics, results and transcripts as
+        artifacts. Returns the MLflow run ids; needs "llmdyno[mlflow]"."""
+        from ..integrations.mlflow import log_to_mlflow
+        return log_to_mlflow(self, experiment=experiment, tracking_uri=tracking_uri, transcripts=transcripts)
+
+    def log_to_wandb(self, project: str = "llmdyno", entity: str | None = None, name: str | None = None,
+                     mode: str | None = None, dir: str | None = None, transcripts: bool = True) -> str:
+        """The leaderboard, configurations and runs as W&B tables, transcripts as an artifact (mode="offline"
+        works without an account). Returns the W&B run id; needs "llmdyno[wandb]"."""
+        from ..integrations.wandb import log_to_wandb
+        return log_to_wandb(self, project=project, entity=entity, name=name, mode=mode, dir=dir,
+                            transcripts=transcripts)
+
+    def log_to_langfuse(self, client=None, public_key: str | None = None, secret_key: str | None = None,
+                        host: str | None = None) -> list:
+        """Each run as a Langfuse trace with one generation per model request and the grader scores. Returns the
+        trace ids; needs "llmdyno[langfuse]"."""
+        from ..integrations.langfuse import log_to_langfuse
+        return log_to_langfuse(self, client=client, public_key=public_key, secret_key=secret_key, host=host)
+
+    def to_otel(self, tracer_provider=None, endpoint: str | None = None, headers: dict | None = None,
+                service_name: str = "llmdyno") -> int:
+        """Each run as an OpenTelemetry trace (GenAI semantic conventions) for any OTLP backend. Returns the number
+        of spans; needs "llmdyno[otel]"."""
+        from ..integrations.otel import export_otel
+        return export_otel(self, tracer_provider=tracer_provider, endpoint=endpoint, headers=headers,
+                           service_name=service_name)
+
+    def push_to_hub(self, repo_id: str, private: bool = True, token: str | None = None) -> str:
+        """Publish these results as a Hugging Face dataset (Parquet tables, a dataset card, the full results JSON);
+        private unless you say otherwise. Returns its URL; needs "llmdyno[hub]"."""
+        from ..integrations.hub import push_results
+        return push_results(self, repo_id, private=private, token=token)
+
+    def to_inspect_log(self, path: Union[str, Path], task: str = "llmdyno") -> Path:
+        """Write these results as an Inspect AI eval log (one sample per run) to open with `inspect view`;
+        needs "llmdyno[inspect]"."""
+        from ..integrations.inspect_eval import to_eval_log
+        return to_eval_log(self, path, task=task)
+
+    @property
+    def plot(self):
+        """Charts like the dashboard's: results.plot.leaderboard(), .heatmap(), .pareto(), .radar(), .tokens();
+        needs "llmdyno[plot]"."""
+        from ..integrations.plot import ResultsPlot
+        return ResultsPlot(self)
 
     def to_csv(self, path: Union[str, Path, None] = None, level: str = "configs") -> str:
         rows = self.leaderboard() if level == "configs" else self.runs()
@@ -212,16 +279,8 @@ class Results:
                 + (f", best {b['profile']} · {b['harness']} {b['final']}" if b else "") + ">")
 
     def _repr_html_(self):
-        lb = self.leaderboard()
-        if not lb:
-            return "<p>No finished runs yet.</p>"
-        import html
-        keys = ["rank", "profile", "harness", "final", "correctness", "instruction_following", "quality", "efficiency",
-                "runs", "cost_usd_total"]
-        head = "".join(f"<th>{html.escape(k.replace('_', ' '))}</th>" for k in keys)
-        body = "".join("<tr>" + "".join(f"<td>{html.escape('' if r.get(k) is None else str(r.get(k)))}</td>" for k in keys)
-                       + "</tr>" for r in lb)
-        return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+        from ..integrations.notebook import results_html
+        return results_html(self)
 
 
 # ------------------------------------------------------------------ saved weights
@@ -264,3 +323,9 @@ def load_sample() -> str:
 def unload_sample() -> None:
     """Remove the sample plan, its runs, reviews and profiles."""
     call("results.unload_sample")
+
+
+def load_results_from_hub(repo_id: str, revision: str | None = None, token: str | None = None) -> "Results":
+    """Results someone published with Results.push_to_hub(); needs "llmdyno[hub]"."""
+    from ..integrations.hub import load_results
+    return load_results(repo_id, revision=revision, token=token)

@@ -19,6 +19,7 @@ ENV_KEYS = {
     "qwen": ["DASHSCOPE_API_KEY"], "minimax": ["MINIMAX_API_KEY"], "xai": ["XAI_API_KEY"],
     "mistral": ["MISTRAL_API_KEY"], "openrouter": ["OPENROUTER_API_KEY"], "groq": ["GROQ_API_KEY"],
     "together": ["TOGETHER_API_KEY"], "fireworks": ["FIREWORKS_API_KEY"], "cerebras": ["CEREBRAS_API_KEY"],
+    "litellm": ["LITELLM_API_KEY", "LITELLM_MASTER_KEY"],
 }
 LOCAL_PARAM_NAMES = {"ctx", "gpu_layers", "auto_fit", "fit_margin_mib", "n_cpu_moe", "flash_attn", "cache_k", "cache_v",
                      "threads", "batch", "ubatch", "parallel", "mlock", "no_mmap", "swa_full", "thinking",
@@ -186,7 +187,8 @@ def cloud_model(vendor: str, model: str, *, api_key: str | None = None, name: st
     """A cloud model to benchmark, e.g. cloud_model("anthropic", "claude-sonnet-5-5", reasoning_effort="low").
 
     vendor: openai, anthropic, google, deepseek, moonshot, zai, qwen, minimax, xai, mistral, openrouter, groq, together,
-    fireworks, cerebras, or custom (any OpenAI-compatible base_url, such as Ollama or vLLM).
+    fireworks, cerebras, litellm (a LiteLLM proxy: see litellm_model()), or custom (any OpenAI-compatible base_url,
+    such as Ollama or vLLM: see ollama_model() and openai_compatible()).
     api_key: stored encrypted in the data folder; when omitted, the saved key or the usual environment variable
     (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, …) is used. The key only ever reaches LLMDyno's proxy.
     budget_usd: hard spend cap for this provider (new providers default to $5).
@@ -197,7 +199,7 @@ def cloud_model(vendor: str, model: str, *, api_key: str | None = None, name: st
     v = vendors.get(vendor)
     if not v:
         raise LLMDynoError(f"unknown vendor {vendor!r}; one of: {', '.join(vendors)}")
-    if vendor == "custom" and not base_url:
+    if vendor == "custom" and not base_url:  # litellm has a default (a proxy on this machine's port 4000)
         raise LLMDynoError("a custom provider needs base_url=, e.g. http://host.docker.internal:11434/v1 for Ollama")
     key = api_key or next((os.environ[e] for e in ENV_KEYS.get(vendor, []) if os.environ.get(e)), None)
     provs = [p for p in call("providers.list_providers")
@@ -217,7 +219,7 @@ def cloud_model(vendor: str, model: str, *, api_key: str | None = None, name: st
         body = {"vendor": vendor, "base_url": base_url, "api_style": api_style, "api_key": key,
                 "budget_usd": 5 if budget_usd is None else budget_usd}
         prov = call("providers.create_provider", body={k: v_ for k, v_ in body.items() if v_ is not None})
-    if vendor != "custom" and not prov.get("has_key"):
+    if not v.get("key_optional") and not prov.get("has_key"):
         envs = " or ".join(ENV_KEYS.get(vendor, [])) or "an environment variable"
         raise LLMDynoError(f"no API key for {v['name']}: pass api_key= or set {envs}")
     if pricing == "auto":
