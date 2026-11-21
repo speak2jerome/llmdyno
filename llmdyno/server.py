@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 
-from . import __version__, config, db, events, jobs, safety
+from . import __version__, config, db, errors, events, jobs, safety
 from .api import external_api, results_api, routes
 from .inference import llamacpp
 from .runner import sandbox
@@ -37,6 +37,12 @@ app = FastAPI(title="LLMDyno", version=__version__, lifespan=lifespan)
 app.include_router(routes.router, prefix="/api")
 app.include_router(results_api.router, prefix="/api")
 app.include_router(external_api.router, prefix="/api")
+
+
+@app.exception_handler(errors.LLMDynoError)
+async def llmdyno_error(_, exc):
+    """Every service error carries its HTTP status (errors.py); the body is {"detail": message} as before."""
+    return JSONResponse({"detail": str(exc)}, status_code=getattr(exc, "status", 400))
 
 
 @app.exception_handler(KeyError)

@@ -48,24 +48,7 @@ TERMINAL = ("done", "failed", "cancelled", "paused")
 
 
 # ================================================================== errors
-class LLMDynoError(Exception):
-    """Anything LLMDyno refuses or fails to do; the message says why and usually what to change."""
-
-
-class NotFoundError(LLMDynoError, LookupError):
-    pass
-
-
-class ConflictError(LLMDynoError):
-    pass
-
-
-class PreflightError(LLMDynoError):
-    """A plan cannot start. `problems` are the blocking items, `warnings` the rest of the preflight report."""
-
-    def __init__(self, problems, warnings=None, report=None):
-        self.problems, self.warnings, self.report = list(problems), list(warnings or []), report or {}
-        super().__init__("the plan cannot start:\n  - " + "\n  - ".join(self.problems))
+from .errors import ConflictError, LLMDynoError, NotFoundError, PreflightError  # noqa: E402,F401 - public names
 
 
 def _call(fn, *args, **kwargs):
@@ -718,8 +701,8 @@ class Plan:
 
     def swebench_predictions(self, path: Union[str, Path, None] = None) -> str:
         """The plan's SWE-bench patches in the official predictions JSONL format (written to path if given)."""
-        from .api import external_api
-        body = _call(external_api.swebench_predictions, self.id).body.decode("utf-8")
+        from .services import plans as svc_plans
+        body = _call(svc_plans.swebench_predictions, self.id)["content"]
         if path:
             Path(path).write_text(body, encoding="utf-8")
         return body
