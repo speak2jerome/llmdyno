@@ -161,7 +161,8 @@ Want to look around first? **Settings → Sample results** loads the round-1 stu
 before you run anything.
 
 Other commands: `llmdyno doctor` (check dependencies), `llmdyno specs` (print the detected hardware),
-`llmdyno --version`. Data lives in `./data` inside the checkout (or `%LOCALAPPDATA%\LLMDyno`,
+`llmdyno --version`, and every library call as a command (`llmdyno list-models`, `llmdyno bench ...`,
+`llmdyno run transcript RUN_ID`, `--json` for scripts); `llmdyno --help` lists them. Data lives in `./data` inside the checkout (or `%LOCALAPPDATA%\LLMDyno`,
 `~/Library/Application Support/LLMDyno` or `~/.local/share/llmdyno` for a pip install), or wherever `LLMDYNO_DATA`
 points.
 

@@ -63,6 +63,27 @@ _BY_STATUS = {400: InvalidError, 403: ForbiddenError, 404: NotFoundError, 409: C
               428: RiskNotAcknowledgedError, 429: RateLimitError, 502: UpstreamError, 507: InsufficientStorageError}
 
 
+def from_exception(exc: BaseException) -> LLMDynoError | None:
+    """The LLMDyno error for an exception raised inside the engine, with the HTTP status the web API has always
+    answered with (KeyError 404, ValueError 400, PermissionError 403, FileExistsError 409, FileNotFoundError 400,
+    ConnectionError 502, RuntimeError 400); None for anything else (a bug, which should surface as is)."""
+    if isinstance(exc, LLMDynoError):
+        return exc
+    if isinstance(exc, FileExistsError):
+        return http(409, exc)
+    if isinstance(exc, FileNotFoundError):
+        return http(400, str(exc) or "file or folder not found")
+    if isinstance(exc, PermissionError):
+        return http(403, exc)
+    if isinstance(exc, ConnectionError):
+        return http(502, exc)
+    if isinstance(exc, KeyError):
+        return http(404, f"not found: {exc}")
+    if isinstance(exc, (ValueError, RuntimeError)):
+        return http(400, exc)
+    return None
+
+
 def http(status: int, detail) -> LLMDynoError:
     """The error class for an HTTP status, with that message (services use this where the web API used
     HTTPException, so status codes and messages stay exactly as they were)."""

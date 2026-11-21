@@ -34,3 +34,71 @@ def specs(vram_free_mib=None, vram_total_mib=16303, ram_gb=64):
 @pytest.fixture
 def meta():
     return dense_meta()
+
+
+class Recorder:
+    """A library backend that records calls and answers from a table instead of running anything, for SDK calls with
+    effects outside the test's data folder (panic, Docker, downloads, cloud APIs)."""
+
+    def __init__(self, replies=None):
+        from llmdyno.sdk._backend import Backend
+        self.calls, self.replies = [], dict(replies or {})
+        self.__class__ = type("RecorderBackend", (Recorder, Backend), {})
+
+    kind = "recorder"
+
+    def call(self, op, **kwargs):
+        self.calls.append((op, kwargs))
+        reply = self.replies[op]
+        return reply(**kwargs) if callable(reply) else reply
+
+    def subscribe(self, fn, topics):
+        return None
+
+    def ops(self):
+        return [op for op, _ in self.calls]
+
+
+@pytest.fixture
+def recorder():
+    """llmdyno calls go to a Recorder for the test: set .replies[op] before calling."""
+    from llmdyno.sdk import _backend
+    rec = Recorder()
+    prev = _backend.use(rec)
+    try:
+        yield rec
+    finally:
+        _backend.use(prev)
+
+
+def write_gguf(path, n_layer=2, n_embd=64, n_head=4, n_vocab=32, ctx=4096, name="Tiny Test"):
+    """A small but valid GGUF file (llama architecture, F32 tensors) that the header reader and importer accept."""
+    import struct
+    from pathlib import Path
+
+    def s(text):
+        b = text.encode()
+        return struct.pack("<Q", len(b)) + b
+    kv = [("general.architecture", 8, "llama"), ("general.name", 8, name), ("llama.block_count", 4, n_layer),
+          ("llama.embedding_length", 4, n_embd), ("llama.attention.head_count", 4, n_head),
+          ("llama.attention.head_count_kv", 4, n_head), ("llama.context_length", 4, ctx)]
+    tensors = [("token_embd.weight", [n_embd, n_vocab])]
+    tensors += [(f"blk.{i}.attn_q.weight", [n_embd, n_embd]) for i in range(n_layer)]
+    tensors += [("output.weight", [n_embd, n_vocab])]
+    head = b"GGUF" + struct.pack("<IQQ", 3, len(tensors), len(kv))
+    for key, t, v in kv:
+        head += s(key) + struct.pack("<I", t) + (s(v) if t == 8 else struct.pack("<I", v))
+    offset, blobs = 0, []
+    for tname, shape in tensors:
+        size = 4
+        for d in shape:
+            size *= d
+        head += s(tname) + struct.pack("<I", len(shape)) + b"".join(struct.pack("<Q", d) for d in shape)
+        head += struct.pack("<IQ", 0, offset)
+        blobs.append(bytes(size))
+        offset += (size + 31) // 32 * 32
+    head += bytes((-len(head)) % 32)
+    data = b"".join(b + bytes((-len(b)) % 32) for b in blobs)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_bytes(head + data)
+    return Path(path)

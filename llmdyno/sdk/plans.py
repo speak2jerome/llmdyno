@@ -13,14 +13,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 __all__ = ["Plan", "bench", "preflight", "list_plans", "plan"]
 
-# Web API routes this module does not cover yet (see sdk/parity.py); remove each one as it gets a library call.
-PENDING_ROUTES = (
-    "DELETE /api/plans/{pid}",
-    "PATCH /api/plans/{pid}",
-    "POST /api/plans/{pid}/retry",
-)
-
-
 def _plan_body(models, benchmarks, harnesses, iterations, name, options):
     ids = [profile(m).id for m in _as_list(models)]
     if not ids:
@@ -105,8 +97,32 @@ class Plan(Handle):
         return Job(jid) if jid else None
 
     def runs(self) -> list:
-        """Every run with its status, scores and timing."""
+        """Every run with its status, scores and timing (dicts; run(id) or get_runs() give Run objects)."""
         return self._get().get("runs") or []
+
+    def get_runs(self) -> list:
+        """Every run as a Run object (transcript, files, logs, retry, …)."""
+        from .runs import Run
+        return [Run(r["id"]) for r in self.runs()]
+
+    @covers("POST /api/plans/{pid}/retry")
+    def retry(self, statuses=("failed", "cancelled"), wait: bool = True, quiet: bool = False, on_event=None):
+        """Run the failed and cancelled runs again (or those with the given statuses) and, with wait=True, wait for
+        the plan and return its Results; otherwise return how many runs were queued."""
+        r = call("plans.retry_plan", pid=self.id, body={"statuses": list(statuses)})
+        self._job = r.get("job_id")
+        _say(quiet, f"Retrying {r['requeued']} run(s)")
+        return self.wait(quiet=quiet, on_event=on_event) if wait else r["requeued"]
+
+    @covers("PATCH /api/plans/{pid}")
+    def rename(self, name: str) -> "Plan":
+        self._d = call("plans.rename_plan", pid=self.id, body={"name": name})
+        return self
+
+    @covers("DELETE /api/plans/{pid}")
+    def delete(self, files: bool = True) -> None:
+        """Delete the plan, its runs and reviews; files=True also deletes the run folders (workspaces, logs)."""
+        call("plans.delete_plan", pid=self.id, delete_files=files)
 
     def __repr__(self):
         d = self._get()

@@ -39,46 +39,16 @@ app.include_router(results_api.router, prefix="/api")
 app.include_router(external_api.router, prefix="/api")
 
 
-@app.exception_handler(errors.LLMDynoError)
-async def llmdyno_error(_, exc):
-    """Every service error carries its HTTP status (errors.py); the body is {"detail": message} as before."""
-    return JSONResponse({"detail": str(exc)}, status_code=getattr(exc, "status", 400))
+async def _error(_, exc):
+    """One mapping for every error, shared with the Python library (errors.from_exception): the body is
+    {"detail": message} with the status that error means."""
+    err = errors.from_exception(exc)
+    return JSONResponse({"detail": str(err)}, status_code=err.status)
 
 
-@app.exception_handler(KeyError)
-async def key_error(_, exc):
-    return JSONResponse({"detail": f"not found: {exc}"}, status_code=404)
-
-
-@app.exception_handler(ValueError)
-async def value_error(_, exc):
-    return JSONResponse({"detail": str(exc)}, status_code=400)
-
-
-@app.exception_handler(PermissionError)
-async def perm_error(_, exc):
-    return JSONResponse({"detail": str(exc)}, status_code=403)
-
-
-@app.exception_handler(FileExistsError)
-async def exists_error(_, exc):
-    return JSONResponse({"detail": str(exc)}, status_code=409)
-
-
-@app.exception_handler(FileNotFoundError)
-async def missing_error(_, exc):
-    return JSONResponse({"detail": str(exc) or "file or folder not found"}, status_code=400)
-
-
-@app.exception_handler(ConnectionError)
-async def conn_error(_, exc):
-    return JSONResponse({"detail": str(exc)}, status_code=502)
-
-
-@app.exception_handler(RuntimeError)
-async def runtime_error(_, exc):
-    # RuntimeErrors raised by LLMDyno carry user-facing explanations (missing tools, Docker problems)
-    return JSONResponse({"detail": str(exc)}, status_code=400)
+for _cls in (errors.LLMDynoError, KeyError, ValueError, PermissionError, FileExistsError, FileNotFoundError,
+             ConnectionError, RuntimeError):
+    app.add_exception_handler(_cls, _error)
 
 
 @app.websocket("/ws")
@@ -132,11 +102,8 @@ def health():
 
 @app.post("/api/upload/benchmark")
 async def upload_benchmark(file: UploadFile = File(...)):
-    from .benchmarks import registry
-    data = await file.read()
-    if len(data) > 50 * 2**20:
-        raise HTTPException(413, "zip larger than 50 MB")
-    return registry.import_zip(data)
+    from .services import benchmarks as svc_benchmarks
+    return svc_benchmarks.import_benchmark_zip(data=await file.read())
 
 
 @app.get("/{full_path:path}", include_in_schema=False)

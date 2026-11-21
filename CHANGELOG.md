@@ -11,6 +11,29 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ### Added
 
+- **The library can do everything the dashboard does.** Every web API route has a library call (116 of them), and a
+  test keeps it that way. New objects with their methods: `Model`, `Provider`, `Harness`, `Benchmark`, `Suite`, `Run`,
+  `Transcript`, `Settings` and `Job`. Among the new calls:
+  - models: `search_models()`, `repo_info()`, `estimate()` (fit before downloading), `download_model()`,
+    `import_models()`, `recommended_models()`, `Model.contexts()`, `.profile()`, `.pause()`, `.resume()`, `.delete()`;
+  - profiles: `Profile.duplicate()`, `.export()`, `import_profile()`, `profile_defaults()`, and `update()` for the name,
+    notes, tags and pricing;
+  - providers: `provider()`, `add_provider()`, `Provider.test()`, `.models()`, keys, budget and spend, `vendors()`,
+    `lookup_price()`;
+  - harnesses: `harness()`, `Harness.build()`, `.dockerfile()`, `.preview()`, runtimes, custom harnesses;
+  - benchmarks: `benchmark()`, `create_benchmark()`, `Benchmark.update()`, `.duplicate()`, `.export()`, `.validate()`,
+    `import_benchmark()`, suites, and the SWE-bench and polyglot setup calls;
+  - runs: `run()`, `Run.transcript()` with `turns()`, `tool_calls()`, `thinking()` and `usage()`, `.files()`,
+    `.read_file()`, `.download()`, `.log()`, `.gpu()`, `.requests()`, `.retry()`, `.regrade()`, `.cancel()`;
+  - plans: `Plan.retry()`, `.rename()`, `.delete()`, `.get_runs()`;
+  - results: every Results-page option (`benchmarks=`, `pass_threshold=`, `quality_weights=`, `efficiency_ref=`),
+    `cells()`, `rubric()`, `agreement()`, `reviews()`, `reference()`, `export()`, `save_weights()`, the sample data;
+  - judging: `review()` with a custom rubric, guidance and single runs, `judge_defaults()`, `reviews()`,
+    `delete_reviews()`;
+  - Artificial Analysis, settings, Hugging Face token, specs, GPU, jobs, cleanup, panic and Docker repair.
+- **Command line for everything**: every library call is a `llmdyno` command, generated from the library
+  (`llmdyno list-models`, `llmdyno run transcript RUN_ID --view tool-calls`, `--json` for scripts). A test keeps the
+  two in step.
 - `llmdyno.watch(plan or run or job)` yields live events (run and plan changes, GPU samples, job progress and, with
   `transcript=True`, every agent event and model request). `bench()`, `Plan.wait()` and `Plan.resume()` take
   `on_event=`. Live events no longer need the web server to be running.
@@ -19,9 +42,6 @@ than modified. Patch releases (0.1.1) only fix bugs.
 - Library objects expose their data: `obj["field"]`, `obj.get()`, `obj.to_dict()` and `obj.refresh()`.
 - The full error family is public: `InvalidError`, `ForbiddenError`, `RiskNotAcknowledgedError`, `RateLimitError`,
   `UpstreamError` and `InsufficientStorageError` join `NotFoundError`, `ConflictError` and `PreflightError`.
-- A parity test maps every web API route to the library call that covers it, the groundwork for 0.4.0's goal of
-  library and dashboard doing exactly the same things.
-
 ### Changed
 
 - Internals: the web API's logic moved into `llmdyno/services` (one module per area) and the library into
@@ -29,6 +49,13 @@ than modified. Patch releases (0.1.1) only fix bugs.
   headers and body as in 0.3.1.
 - `cloud_model()` saves the given or environment API key every time instead of comparing it with the stored one first
   (same result, and it works without reading the secret store).
+- Library calls raise the same errors the web API answers with (a missing benchmark is `NotFoundError`, a built-in one
+  you try to edit is `ForbiddenError`, …) instead of Python's `KeyError` or `PermissionError`; the mapping lives in one
+  place, `llmdyno.errors.from_exception`, used by both.
+
+### Fixed
+
+- Uploading a file that is not a zip as a benchmark answered with a server error; it now says what is wrong (400).
 
 ## [0.3.1] - 2026-11-22
 

@@ -6,18 +6,9 @@ from typing import Sequence, Union
 from ..errors import LLMDynoError
 from ._core import Job, _say, call, covers
 
-__all__ = ["Doctor", "doctor", "setup"]
+__all__ = ["Doctor", "doctor", "setup", "specs", "gpu_usage", "active_work", "panic", "cleanup", "list_jobs",
+           "clear_jobs", "start_docker", "repair_docker", "install_docker", "use_llama_cpp"]
 
-# Web API routes this module does not cover yet (see sdk/parity.py); remove each one as it gets a library call.
-PENDING_ROUTES = (
-    "DELETE /api/jobs",
-    "GET /api/jobs",
-    "GET /api/system/active",
-    "POST /api/system/cleanup",
-    "GET /api/system/gpu",
-    "POST /api/system/panic",
-    "GET /api/system/specs",
-)
 
 
 class Doctor(list):
@@ -96,3 +87,80 @@ def setup(harnesses: Union[str, Sequence[str]] = ("pi",), *, quality: bool = Tru
     if not todo:
         _say(quiet, "Everything requested is already set up.")
     return doctor()
+
+
+# ------------------------------------------------------------------ machine
+@covers("GET /api/system/specs")
+def specs(refresh: bool = False) -> dict:
+    """This machine: CPU and instruction sets, RAM, GPUs with VRAM and driver, disk, OS and Docker (what the
+    Overview page shows). refresh=True detects again instead of using the cached result."""
+    return call("system.get_specs", refresh=refresh)
+
+
+@covers("GET /api/system/gpu")
+def gpu_usage() -> list:
+    """Live GPU readings: utilisation, VRAM used and free, temperature and power for each GPU."""
+    return call("system.system_gpu")
+
+
+# ------------------------------------------------------------------ stopping things
+@covers("GET /api/system/active")
+def active_work() -> dict:
+    """What panic() would stop right now: running jobs, plans, containers and the llama-server."""
+    return call("system.system_active")
+
+
+@covers("POST /api/system/panic")
+def panic() -> dict:
+    """Stop everything at once (the red button): cancels every job and plan, kills LLMDyno's containers and the
+    llama-server. Finished runs are kept. Returns what was stopped."""
+    return call("system.system_panic")
+
+
+@covers("POST /api/system/cleanup")
+def cleanup() -> int:
+    """Remove sandbox containers left behind by crashed or interrupted runs; returns how many were removed."""
+    return call("system.cleanup_containers")["removed"]
+
+
+# ------------------------------------------------------------------ background jobs
+@covers("GET /api/jobs")
+def list_jobs(active: bool = False, kind: str | None = None, limit: int = 100) -> list:
+    """Background jobs, newest first (downloads, builds, plans, reviews, imports). active=True keeps the queued and
+    running ones; kind filters by type ("download", "build", "plan", "judge", "import", "install", …)."""
+    return [Job(d) for d in call("system.list_jobs", active=active, limit=limit, kind=kind)]
+
+
+@covers("DELETE /api/jobs")
+def clear_jobs() -> int:
+    """Forget finished jobs (done, failed, cancelled, interrupted); returns how many were removed."""
+    return call("system.clear_jobs")["removed"]
+
+
+# ------------------------------------------------------------------ Docker and llama.cpp
+def _dep(dep_id: str, action: str, **extra) -> dict:
+    return call("system.dep_action", dep_id=dep_id, body={"action": action, **extra})
+
+
+@covers("POST /api/system/deps/{dep_id}/action")
+def start_docker() -> str:
+    """Start Docker Desktop (Windows and macOS); it takes about a minute to come up."""
+    return _dep("docker", "start_docker")["message"]
+
+
+@covers("POST /api/system/deps/{dep_id}/action")
+def repair_docker() -> str:
+    """Restart Docker Desktop after moving aside stale sockets that keep it from starting (a known Windows issue)."""
+    return _dep("docker", "repair_docker")["message"]
+
+
+@covers("POST /api/system/deps/{dep_id}/action")
+def install_docker(quiet: bool = False) -> dict:
+    """Download and run the Docker Desktop installer (Windows and macOS; Linux uses the distribution's packages)."""
+    return Job(_dep("docker", "install_docker")["job_id"]).wait(quiet=quiet)
+
+
+@covers("POST /api/system/deps/{dep_id}/action")
+def use_llama_cpp(path: str) -> dict:
+    """Use a llama.cpp build you already have (the folder holding llama-server) instead of installing one."""
+    return _dep("llama_cpp", "use_existing_llama", path=str(path))["llama_cpp"]

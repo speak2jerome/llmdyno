@@ -57,7 +57,15 @@ class LocalBackend(Backend):
     def call(self, op: str, **kwargs):
         if not self._ready:
             self.start()
-        return resolve(op)(**kwargs)
+        fn = resolve(op)
+        try:
+            return fn(**kwargs)
+        except Exception as e:
+            from ..errors import from_exception
+            err = from_exception(e)               # the same error the web API would answer with
+            if err is None or err is e:
+                raise
+            raise err from e
 
     def subscribe(self, fn, topics):
         """In-process events: plans, downloads and reviews started from this process publish here directly.

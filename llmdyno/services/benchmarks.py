@@ -38,6 +38,17 @@ def duplicate_benchmark(bid: str, body: dict):
     return benches.duplicate(bid, body.get("new_id", ""))
 
 
+def import_benchmark_zip(data: bytes):
+    """A benchmark exported as a zip (export_benchmark, or made by hand: one <id>/benchmark.json folder)."""
+    import zipfile
+    if len(data) > 50 * 2**20:
+        raise errors.http(413, "zip larger than 50 MB")
+    try:
+        return benches.import_zip(data)
+    except zipfile.BadZipFile:
+        raise errors.http(400, "that file is not a zip; export a benchmark to get one") from None
+
+
 def export_benchmark(bid: str):
     return download(benches.export_zip(bid), f"{bid}.zip", "application/zip")
 

@@ -1,6 +1,7 @@
 """LLM profiles: a model plus the exact settings it is benchmarked with. cloud_model() and local_model() make them."""
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Union
@@ -8,15 +9,9 @@ from typing import Union
 from ..errors import ConflictError, LLMDynoError, NotFoundError
 from ._core import Handle, Job, _say, call, covers
 
-__all__ = ["Profile", "list_profiles", "profile", "cloud_model", "local_model"]
+__all__ = ["Profile", "list_profiles", "profile", "cloud_model", "local_model", "import_profile",
+           "profile_defaults"]
 
-# Web API routes this module does not cover yet (see sdk/parity.py); remove each one as it gets a library call.
-PENDING_ROUTES = (
-    "GET /api/profiles/defaults",
-    "POST /api/profiles/import",
-    "POST /api/profiles/{pid}/duplicate",
-    "GET /api/profiles/{pid}/export",
-)
 
 ENV_KEYS = {
     "openai": ["OPENAI_API_KEY"], "anthropic": ["ANTHROPIC_API_KEY"], "google": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
@@ -67,9 +62,15 @@ class Profile(Handle):
 
     # -- actions
     @covers("PATCH /api/profiles/{pid}")
-    def update(self, **params) -> "Profile":
-        """Change settings, e.g. update(ctx=32768, cache_k="q4_0") or update(reasoning_effort="high")."""
-        self._d = call("profiles.patch_profile", pid=self.id, body={"params": _params(self.kind, params)})
+    def update(self, *, name: str | None = None, notes: str | None = None, tags: list | None = None,
+               pricing: dict | None = None, remote_model: str | None = None, **params) -> "Profile":
+        """Change settings, e.g. update(ctx=32768, cache_k="q4_0") or update(reasoning_effort="high"), and the
+        name, notes, tags, pricing ({"input", "output", "cached"} USD per 1M tokens) or a cloud profile's model."""
+        body = {k: v for k, v in (("name", name), ("notes", notes), ("tags", tags), ("pricing", pricing),
+                                  ("remote_model", remote_model)) if v is not None}
+        if params:
+            body["params"] = _params(self.kind, params)
+        self._d = call("profiles.patch_profile", pid=self.id, body=body)
         return self
 
     @covers("POST /api/profiles/check")
@@ -91,6 +92,26 @@ class Profile(Handle):
     @covers("DELETE /api/profiles/{pid}")
     def delete(self) -> None:
         call("profiles.delete_profile", pid=self.id)
+
+    @covers("POST /api/profiles/{pid}/duplicate")
+    def duplicate(self, name: str | None = None, **params) -> "Profile":
+        """A copy ("<name> (copy)" unless you name it), optionally with changed settings."""
+        copy = Profile(call("profiles.duplicate_profile", pid=self.id))
+        patch = {}
+        if name:
+            patch["name"] = name
+        if params:
+            patch["params"] = _params(self.kind, params)
+        return Profile(call("profiles.patch_profile", pid=copy.id, body=patch)) if patch else copy
+
+    @covers("GET /api/profiles/{pid}/export")
+    def export(self, path: Union[str, Path, None] = None) -> dict:
+        """The profile as a shareable file (settings, pricing and which model or vendor, never keys); written to
+        path if given. import_profile() reads it back, here or on another machine."""
+        d = call("profiles.export_profile", pid=self.id)
+        if path:
+            Path(path).write_text(d["content"], encoding="utf-8")
+        return json.loads(d["content"])
 
 
 def _params(kind, given):
@@ -226,7 +247,10 @@ def local_model(repo: str | None = None, *, quant: str | None = None, path: Unio
         m = _model_from_path(Path(path).expanduser(), quant)
     else:
         m = _model_from_repo(repo, quant, download, quiet)
-    m = call("models.model_detail", mid=m["id"])
+    return _local_profile(call("models.model_detail", mid=m["id"]), name, params, quiet)
+
+
+def _local_profile(m: dict, name, params, quiet) -> Profile:
     given = _params("local", params)
     ctx = given.get("ctx")
     default_name = m["name"] + (f" · {ctx // 1024}k" if ctx else "")
@@ -259,6 +283,8 @@ def _model_from_path(p: Path, quant):
 
 
 def _model_from_repo(repo, quant, download, quiet):
+    from .models import Model, download_model
+
     def match(m):
         return not quant or (m["quant"] or "").lower() == quant.lower() or quant.lower() in (m["name"] or "").lower()
     mine = [m for m in call("models.list_models") if m["repo"] == repo and match(m)]
@@ -268,20 +294,26 @@ def _model_from_repo(repo, quant, download, quiet):
     if not download:
         raise NotFoundError(f"{repo} {quant or ''} is not downloaded (pass download=True)".replace("  ", " "))
     if mine:                                              # an interrupted download: carry on
-        r = call("models.model_resume", mid=mine[0]["id"])
         _say(quiet, f"Resuming download of {repo} {mine[0]['quant']}")
-        Job(r["job_id"]).wait(quiet=quiet)
-        return mine[0]
-    info = call("models.hub_repo", repo=repo)
-    variants = [v for v in info["variants"] if not v["mmproj"]]
-    if not quant:
-        raise LLMDynoError(f"pick a quant for {repo}: {', '.join(v['quant'] for v in variants)}")
-    hit = [v for v in variants if v["quant"].lower() == quant.lower()] or \
-          [v for v in variants if quant.lower() in v["id"].lower()]
-    if not hit:
-        raise NotFoundError(f"{repo} has no {quant}; available: {', '.join(v['quant'] for v in variants)}")
-    v = hit[0]
-    _say(quiet, f"Downloading {repo} {v['quant']} ({v['size_bytes'] / 2**30:.1f} GB)")
-    r = call("models.model_download", body={"repo": repo, "variant_id": v["id"]})
-    Job(r["job_id"]).wait(quiet=quiet)
-    return {"id": r["model_id"]}
+        return Model(mine[0]).resume(quiet=quiet).to_dict()
+    return download_model(repo, quant, quiet=quiet).to_dict()
+
+
+# ------------------------------------------------------------------ sharing and defaults
+@covers("POST /api/profiles/import")
+def import_profile(source: Union[str, Path, dict]) -> Profile:
+    """Create a profile from an exported profile file (a path or the dict Profile.export() returned). Its model
+    must already be downloaded here, or a provider of its vendor added, first."""
+    body = source if isinstance(source, dict) else json.loads(Path(source).expanduser().read_text(encoding="utf-8"))
+    return Profile(call("profiles.import_profile", body=body))
+
+
+@covers("GET /api/profiles/defaults")
+def profile_defaults(kind: str = "local", model=None) -> dict:
+    """The settings a new profile starts from: for "local", tuned to a model (Model, id or name) and this machine;
+    for "cloud", the cloud defaults."""
+    mid = None
+    if model is not None:
+        from .models import model as find_model
+        mid = find_model(model).id
+    return call("profiles.profile_defaults", kind=kind, model_id=mid)

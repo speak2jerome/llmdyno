@@ -42,10 +42,11 @@ def test_coverage_comes_from_public_api(report):
         assert ok, f"{route} is only covered by non-public code: {names}"
 
 
-def test_progress_is_reported(report):
+def test_full_parity(report):
+    """Since 0.4.0 nothing is pending: a new route needs its library call in the same change."""
     total = len(report["covered"]) + len(report["pending"]) + len(report["exempt"])
     assert total == len(parity.app_routes() - parity.NOT_API)
-    assert len(report["covered"]) >= 26           # never goes down
+    assert not report["pending"], f"routes without a library call: {sorted(report['pending'])}"
 
 
 def test_watch_and_aio_are_public():

@@ -10,42 +10,82 @@ from typing import Sequence, Union
 from ..errors import LLMDynoError
 from ._core import _as_list, _id, call, covers
 
-__all__ = ["Results", "results"]
-
-# Web API routes this module does not cover yet (see sdk/parity.py); remove each one as it gets a library call.
-PENDING_ROUTES = (
-    "GET /api/results/export",
-    "POST /api/results/weights",
-    "DELETE /api/sample",
-    "GET /api/sample",
-    "POST /api/sample",
-)
-
+__all__ = ["Results", "results", "save_weights", "sample_status", "load_sample", "unload_sample"]
 
 @covers("GET /api/results")
 def results(plans=None, *, include_sample: bool = False, correctness: float | None = None,
             instruction_following: float | None = None, quality: float | None = None,
-            efficiency: float | None = None) -> "Results":
-    """Scored results for some plans (default: every plan except the bundled sample). The four weights reshape
-    the final score the way the Results page does (defaults 50/15/25/10)."""
+            efficiency: float | None = None, quality_weights: dict | None = None, benchmarks=None,
+            pass_threshold: float = 0.8, efficiency_ref: str = "local") -> "Results":
+    """Scored results for some plans (default: every plan except the bundled sample), with every option of the
+    Results page: the four weights reshape the final score (defaults 50/15/25/10); quality_weights splits code
+    quality between "static", "probes" and "review"; benchmarks limits it to some benchmarks; pass_threshold is the
+    correctness that counts as a pass (pass@k); efficiency_ref compares speed and cost among "local" or "all" runs."""
     ids = [_id(p) for p in _as_list(plans)]
-    w = dict(call("settings.get_settings")["weights"])
+    saved = call("settings.get_settings")
+    w = dict(saved["weights"])
     for k, v in (("correctness", correctness), ("instruction_following", instruction_following),
                  ("quality", quality), ("efficiency", efficiency)):
         if v is not None:
             w[k] = v
-    data = call("results.results", plan_ids=",".join(ids), weights=json.dumps(w), quality_weights="",
-                include_sample=include_sample or bool(ids), benchmark_ids="")
-    return Results(data, ids)
+    qw = {**saved["quality_weights"], **(quality_weights or {})}
+    options = {"plan_ids": ",".join(ids), "weights": json.dumps(w), "quality_weights": json.dumps(qw),
+               "benchmark_ids": ",".join(_id(b) for b in _as_list(benchmarks))}
+    data = call("results.results", pass_threshold=pass_threshold, efficiency_ref=efficiency_ref,
+                include_sample=include_sample or bool(ids), **options)
+    return Results(data, ids, options)
 
 
 class Results:
     """Scored results. print(results) shows the leaderboard; leaderboard() and runs() return rows; to_pandas(),
     to_csv() and to_json() export them; open() shows the dashboard."""
 
-    def __init__(self, data: dict, plan_ids: Sequence[str] = ()):
+    def __init__(self, data: dict, plan_ids: Sequence[str] = (), options: dict | None = None):
         self.data, self.plan_ids = data, list(plan_ids)
         self._labels = data.get("labels") or {}
+        self._options = dict(options or {"plan_ids": ",".join(self.plan_ids)})
+
+    # -- the Results page's other views
+    def cells(self) -> list:
+        """One row per profile × harness × benchmark: pass rate, scores with standard deviation and 95% interval over
+        iterations, time, tokens and cost (the heatmap)."""
+        return [{"profile": self._name(c), "harness": self._harness(c), **c} for c in self.data.get("cells") or []]
+
+    def reviews(self) -> list:
+        """Every LLM-judge review behind these results (scores per rubric dimension, summary, issues)."""
+        return list(self.data.get("reviews") or [])
+
+    def rubric(self) -> list:
+        """Average judge score per rubric dimension for each profile × harness (the rubric chart)."""
+        return [{"profile": self._name(r), "harness": self._harness(r), **r} for r in self.data.get("rubric") or []]
+
+    def agreement(self) -> dict:
+        """How much the judges agree with each other (correlation per judge pair) and how much each favours its own
+        model family: {"judges", "pairs", …}."""
+        return dict(self.data.get("agreement") or {})
+
+    @covers("GET /api/references/aa")
+    def reference(self) -> list:
+        """Each profile's Artificial Analysis coding index next to its score here (needs set_aa_key())."""
+        ref = call("references.aa_reference")
+        out = []
+        for row in self.leaderboard():
+            m = (ref.get("matches") or {}).get(row["profile_id"])
+            out.append({"profile": row["profile"], "harness": row["harness"], "final": row["final"],
+                        "aa_model": (m or {}).get("model"), "aa_score": (m or {}).get("score"),
+                        "aa_manual": (m or {}).get("manual")})
+        return out
+
+    @covers("GET /api/results/export")
+    def export(self, path: Union[str, Path, None] = None, level: str = "runs", fmt: str = "csv") -> str:
+        """The Results page's export: level "runs", "cells" or "configs", fmt "csv" or "json" (with the weights and
+        LLMDyno version recorded). Written to path if given; returns the text."""
+        o = self._options
+        d = call("results.export", plan_ids=o.get("plan_ids", ""), level=level, fmt=fmt, weights=o.get("weights", ""),
+                 quality_weights=o.get("quality_weights", ""), benchmark_ids=o.get("benchmark_ids", ""))
+        if path:
+            Path(path).write_text(d["content"], encoding="utf-8")
+        return d["content"]
 
     def _name(self, r):
         p = (self._labels.get("profiles") or {}).get(r["profile_id"]) or {}
@@ -182,3 +222,45 @@ class Results:
         body = "".join("<tr>" + "".join(f"<td>{html.escape('' if r.get(k) is None else str(r.get(k)))}</td>" for k in keys)
                        + "</tr>" for r in lb)
         return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+
+
+# ------------------------------------------------------------------ saved weights
+@covers("POST /api/results/weights")
+def save_weights(*, correctness: float | None = None, instruction_following: float | None = None,
+                 quality: float | None = None, efficiency: float | None = None,
+                 quality_weights: dict | None = None) -> dict:
+    """Save the default score weights (what results() and the Results page start from). The four main weights are
+    relative (defaults 50/15/25/10); quality_weights splits code quality between "static", "probes" and "review".
+    Returns the saved {"weights", "quality_weights"}."""
+    w = {k: v for k, v in (("correctness", correctness), ("instruction_following", instruction_following),
+                           ("quality", quality), ("efficiency", efficiency)) if v is not None}
+    body = {}
+    if w:
+        body["weights"] = w
+    if quality_weights:
+        body["quality_weights"] = dict(quality_weights)
+    saved = call("results.save_weights", body=body)
+    return {"weights": saved["weights"], "quality_weights": saved["quality_weights"]}
+
+
+# ------------------------------------------------------------------ the bundled sample
+@covers("GET /api/sample")
+def sample_status() -> dict:
+    """{"available", "loaded", "plan_id"} for the bundled sample results (15 configurations measured on an RTX 5080)."""
+    return call("results.sample_status")
+
+
+@covers("POST /api/sample")
+def load_sample() -> str:
+    """Load the bundled sample results into this data folder to explore the dashboard and the API without running
+    anything; returns its plan id. results() leaves it out unless you pass include_sample=True or its plan id."""
+    status = call("results.sample_status")
+    if status["loaded"]:
+        return status["plan_id"]
+    return call("results.load_sample")["plan_id"]
+
+
+@covers("DELETE /api/sample")
+def unload_sample() -> None:
+    """Remove the sample plan, its runs, reviews and profiles."""
+    call("results.unload_sample")

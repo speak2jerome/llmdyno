@@ -104,6 +104,46 @@ profile is projected not to fit in VRAM.
 ```python
 llmdyno.list_profiles()                 # everything, or list_profiles("local") / list_profiles("cloud")
 qwen = llmdyno.profile("Qwen3.8 27B Q3_K_XL 48k")   # by name (case-insensitive) or id
+
+qwen.update(name="Qwen 27B 48k", notes="baseline", tags=["round2"], ctx=49152)
+fast = qwen.duplicate("Qwen 27B 32k", ctx=32768)    # a copy with changed settings
+qwen.export("qwen.profile.json")                    # share it; never contains keys
+llmdyno.import_profile("qwen.profile.json")         # on another machine (the model must be downloaded there)
+llmdyno.profile_defaults("local", model="Qwen3.8-27B-UD-Q3_K_XL")   # what a new profile starts from
+```
+
+### Finding and downloading models
+
+```python
+llmdyno.search_models("qwen coder")                 # Hugging Face GGUF repositories
+info = llmdyno.repo_info("unsloth/Qwen3.8-27B-GGUF")   # quants, sizes, a fit hint for your GPU, license, gated
+fit = llmdyno.estimate("unsloth/Qwen3.8-27B-GGUF", "UD-Q3_K_XL", ctx=65536, kv_cache="q8_0")
+fit["check"]["verdict"], fit["contexts"]            # will it fit, before downloading (reads the GGUF header)
+m = llmdyno.download_model("unsloth/Qwen3.8-27B-GGUF", "UD-Q3_K_XL")   # or wait=False for the Job
+llmdyno.recommended_models()
+
+llmdyno.list_models(status="ready")
+m = llmdyno.model("Qwen3.8-27B-UD-Q3_K_XL")          # by id, name or "repo:quant"
+m.contexts()                                        # memory at each context size on this machine
+m.profile(ctx=32768)                                # a profile from it
+m.pause(); m.resume(); m.delete(files=True)
+llmdyno.import_models("D:/models")                  # register every GGUF in a folder, no copy
+```
+
+### Providers
+
+`cloud_model()` creates providers for you; these manage them directly.
+
+```python
+p = llmdyno.provider("anthropic")                   # by id, name, or vendor when you have one of it
+p.test()                                            # checks the key and lists models: {"ok", "models", "latency_ms"}
+p.models()
+p.spent_usd, p.budget_usd
+p.update(budget_usd=10); p.reset_spend()
+p.set_key("sk-..."); p.remove_key(); p.delete()
+llmdyno.add_provider("custom", base_url="http://localhost:8000/v1", name="vLLM box")
+llmdyno.list_providers(); llmdyno.vendors()
+llmdyno.lookup_price("anthropic", "claude-sonnet-5-5")   # per 1M tokens, from OpenRouter's catalog
 ```
 
 ## Benchmarks
@@ -115,6 +155,35 @@ llmdyno.list_suites()                           # suite_quick, suite_round1, imp
 
 llmdyno.import_swebench("verified_mini")        # 50 SWE-bench Verified tasks (or "lite", "verified", limit=…)
 llmdyno.import_polyglot(["python", "rust"])     # Aider polyglot exercises
+llmdyno.import_catalog()                        # what can be imported and what is ready
+llmdyno.install_swebench_harness(); llmdyno.build_polyglot_image(); llmdyno.remove_imported("polyglot")
+```
+
+Your own benchmarks use the same spec as the benchmark editor (see [BENCHMARKS.md](BENCHMARKS.md)):
+
+```python
+b = llmdyno.benchmark("t0_smoke_cli")           # everything about one benchmark: prompts, stages, grader
+mine = b.duplicate("my_smoke")                  # built-in ones are read-only; copies are yours
+spec = mine.spec(); spec["stages"][0]["prompt"] += " Use type hints."
+mine.update(spec)
+mine.validate()                                 # starter must fail, reference must pass (needs Docker)
+mine.export("my_smoke.zip"); llmdyno.import_benchmark("my_smoke.zip")
+llmdyno.create_benchmark({...})                 # from scratch
+
+s = llmdyno.create_suite("My suite", ["my_smoke", "t5_bugfix_semver"])
+s.update(benchmarks=["my_smoke"]); s.delete()
+```
+
+### Harnesses
+
+```python
+llmdyno.list_harnesses(ready=True)              # images built
+pi = llmdyno.harness("pi")
+pi.build(); pi.remove_image()
+pi.dockerfile(); pi.preview("anthropic")        # exactly what a run executes
+pi.runtime("linux/arm64"); pi.build_runtime("linux/arm64")   # portable runtime for SWE-bench-style images
+llmdyno.add_harness("my-agent.json", build=True)   # your own agent (see HARNESSES.md); .update(), .delete()
+llmdyno.harness_schema()
 ```
 
 ## Running
@@ -143,6 +212,23 @@ plan.runs()            # every run with its status and scores
 plan.pause(); plan.resume(); plan.cancel()
 results = plan.wait()
 plan.open()            # the live plan page in the dashboard
+plan.retry()           # run the failed and cancelled runs again
+plan.rename("Round 2"); plan.delete(files=True)
+```
+
+### Runs
+
+```python
+run = plan.get_runs()[0]                  # or llmdyno.run(run_id); Results.runs() rows carry run ids
+t = run.transcript()
+t.turns()                # one entry per model call: messages sent, reply blocks, finish, tokens, timings, cost
+t.tool_calls()           # every tool call with its arguments and what the tool returned
+t.thinking(); t.final_text(); t.usage(); t.to_pandas()
+run.files(); run.read_file("app.py"); run.download("workspace.zip")
+run.log(stage=1); run.log(stage=1, stream="stderr"); run.server_log()
+run.requests()           # each model request through the proxy
+run.gpu()                # GPU telemetry during the run
+run.retry(); run.regrade(); run.cancel()
 ```
 
 Local models take the GPU one at a time; cloud runs go in parallel (`cloud_concurrency=`). The process stays alive
@@ -200,6 +286,21 @@ llmdyno.results(plans=[...], correctness=100, quality=0, instruction_following=0
 plan.swebench_predictions("preds.jsonl")   # SWE-bench patches in the official predictions format
 ```
 
+Every option and view of the Results page:
+
+```python
+r = llmdyno.results(plan, benchmarks=["t5_bugfix_semver"], pass_threshold=1.0,
+                    quality_weights={"static": 20, "probes": 30, "review": 50}, efficiency_ref="all")
+r.cells()          # profile × harness × benchmark, with spread over iterations (the heatmap)
+r.rubric()         # average judge score per rubric dimension
+r.agreement()      # how much the judges agree, and self-preference
+r.reviews()
+r.reference()      # Artificial Analysis coding index next to each score
+r.export("runs.csv", level="runs")          # the page's export: level runs / cells / configs, fmt csv / json
+llmdyno.save_weights(correctness=60, quality=20)   # the defaults results() and the page start from
+llmdyno.load_sample(); llmdyno.unload_sample()     # the bundled round-1 results, to explore without running anything
+```
+
 In Jupyter, a `Results` object renders as a table.
 
 ## Code review by LLM judges
@@ -210,6 +311,56 @@ results = llmdyno.review(plan, judges=[judge], budget_usd=0.50)
 ```
 
 Blind, shuffled review with LLMDyno's rubric; the scores feed the code-quality part of the final score.
+
+```python
+llmdyno.judge_defaults()                         # the rubric, guidance and default limits
+llmdyno.review(judges=[judge], runs=[run_id], rubric=[...], guidance="Be strict about tests",
+               include_static=True, skip_reviewed=False)
+llmdyno.reviews(plan=plan); llmdyno.reviews(run=run_id)
+llmdyno.delete_reviews(judge, plan=plan)
+```
+
+## Artificial Analysis reference
+
+```python
+llmdyno.set_aa_key("...")        # free key from artificialanalysis.ai
+llmdyno.refresh_aa()             # cached for a day; the free tier allows 100 requests a day
+llmdyno.aa_reference()           # matches per profile and the model list
+llmdyno.set_aa_match(qwen, "qwen3-8-27b")   # pick the match by hand (None: back to automatic)
+```
+
+## Settings, system and jobs
+
+```python
+s = llmdyno.settings()
+s.cloud_concurrency, s.weights, s.data_dir
+s.update(cloud_concurrency=4, electricity_usd_per_kwh=0.30)
+llmdyno.set_hf_token("hf_..."); llmdyno.remove_hf_token()
+
+llmdyno.specs(); llmdyno.gpu_usage()
+llmdyno.list_jobs(active=True); llmdyno.job(job_id).wait(); llmdyno.clear_jobs()
+llmdyno.active_work(); llmdyno.panic()           # the red button: stop everything
+llmdyno.cleanup()                                # remove containers left by crashed runs
+llmdyno.start_docker(); llmdyno.repair_docker(); llmdyno.use_llama_cpp("D:/llama.cpp")
+```
+
+## Command line
+
+Every call above is also a command, generated from the library so the two always match. Function names become
+commands with dashes, methods become `llmdyno <object> <method> ID`, and `--json` gives machine-readable output:
+
+```bash
+llmdyno list-models --status ready
+llmdyno estimate unsloth/Qwen3.8-27B-GGUF UD-Q3_K_XL --set ctx=65536 --set kv_cache=q8_0
+llmdyno bench "Qwen 27B 32k" --benchmarks suite_quick --harnesses pi opencode
+llmdyno watch PLAN_ID
+llmdyno results --plans PLAN_ID --view cells --json
+llmdyno run transcript RUN_ID --view tool-calls
+llmdyno plan retry PLAN_ID
+llmdyno --help; llmdyno run --help; llmdyno bench --help
+```
+
+`llmdyno` alone starts the web app, as before. Errors print to stderr and exit with code 1.
 
 ## The dashboard
 
@@ -256,14 +407,30 @@ with, so an error means the same thing from Python and over REST.
 |---|---|
 | `init(data_dir=None)`, `data_dir()` | the data folder |
 | `doctor()`, `setup(...)` | `Doctor` (list of checks with `.ok`, `.missing`) |
-| `cloud_model(vendor, model, ...)`, `local_model(repo, quant=..., ...)`, `profile(name)`, `list_profiles()` | `Profile` |
-| `list_benchmarks()`, `list_suites()`, `import_swebench()`, `import_polyglot()` | lists and dicts |
+| `cloud_model(vendor, model, ...)`, `local_model(repo, quant=..., ...)`, `profile(name)`, `list_profiles()`, `import_profile(path)` | `Profile` |
+| `profile_defaults(kind, model=)` | dict |
+| `search_models(q)`, `repo_info(repo)`, `estimate(repo, quant, ...)`, `recommended_models()` | lists and dicts |
+| `download_model(repo, quant)`, `model(name)`, `list_models()`, `import_models(folder)` | `Model` |
+| `provider(name)`, `list_providers()`, `add_provider(vendor, ...)` | `Provider` |
+| `vendors()`, `lookup_price(vendor, model)` | lists and dicts |
+| `harness(id)`, `list_harnesses()`, `add_harness(manifest)` | `Harness` |
+| `list_benchmarks()`, `list_suites()`, `import_catalog()` | lists and dicts |
+| `benchmark(id)`, `create_benchmark(spec)`, `import_benchmark(zip)` | `Benchmark` |
+| `suite(id)`, `create_suite(name, benchmarks)` | `Suite` |
+| `import_swebench()`, `import_polyglot()`, `install_swebench_harness()`, `build_polyglot_image()`, `remove_imported(kind)` | job results |
 | `preflight(models, benchmarks, harnesses)` | dict |
 | `bench(models, benchmarks, harnesses, ...)` | `Results` (or `Plan` with `wait=False`) |
 | `list_plans()`, `plan(id)` | `Plan` |
-| `results(plans, weights...)`, `review(plans, judges)` | `Results` |
+| `run(id)`, `plan.get_runs()` | `Run`; `run.transcript()` gives a `Transcript` |
+| `results(plans, weights, benchmarks=, ...)`, `review(plans, judges, ...)` | `Results` |
+| `judge_defaults()`, `reviews(plan=, run=)`, `delete_reviews(judge)` | dicts, lists, counts |
+| `save_weights(...)`, `load_sample()`, `unload_sample()`, `sample_status()` | dicts |
+| `aa_reference()`, `refresh_aa()`, `set_aa_key()`, `remove_aa_key()`, `set_aa_match(profile, slug)` | dicts |
+| `settings()` | `Settings` (`.update(...)`); `set_hf_token()`, `remove_hf_token()` |
+| `specs()`, `gpu_usage()`, `active_work()`, `panic()`, `cleanup()` | dicts, counts |
+| `list_jobs()`, `job(id)`, `clear_jobs()` | `Job` (`.status`, `.progress`, `.log`, `.wait()`, `.cancel()`) |
+| `start_docker()`, `repair_docker()`, `install_docker()`, `use_llama_cpp(path)` | messages |
 | `watch(plan or run or job, transcript=False)` | iterator of `Event` |
-| `job(id)` | `Job` (`.status`, `.progress`, `.log`, `.wait()`, `.cancel()`) |
 | `serve()` | dashboard URL |
 | `llmdyno.aio.<any function>`, `aio.watch()`, `aio.call(fn, ...)` | the same, awaitable |
 
@@ -272,7 +439,7 @@ Every object (`Profile`, `Plan`, `Job`, …) gives its raw data with `obj["field
 
 ## Library and web app parity
 
-Everything the dashboard can do is being brought to the library. `tests/test_parity.py` checks every web API route
-against the library: each one has a library call (marked with `@covers` in `llmdyno/sdk`) or is listed as pending in
-its area's module, and 0.4.0 ships with no pending routes. `python -c "from llmdyno.sdk import parity; print(parity.report())"`
-shows where it stands.
+Everything the dashboard can do, the library can do. `tests/test_parity.py` checks every web API route against the
+library (each library call names the routes it covers with `@covers` in `llmdyno/sdk`), and `tests/test_cli.py` checks
+that every library call has its command, so a new feature reaches the dashboard, Python and the command line together.
+`python -c "from llmdyno.sdk import parity; print(parity.report())"` prints the map.
