@@ -36,6 +36,27 @@ def test_benchmarks_and_harnesses_listed(client):
     assert {"pi", "opencode", "codex", "aider"} <= harnesses
 
 
+def test_pages_work_without_docker_installed(client, monkeypatch):
+    """No docker binary at all (fresh machines, the Windows-on-ARM CI runner): lists must load, not crash."""
+    import subprocess
+
+    from llmdyno.benchmarks import envs
+    from llmdyno.harnesses import images
+    real_run = subprocess.run
+
+    def no_docker(args, *a, **kw):
+        if args and args[0] == "docker":
+            raise FileNotFoundError(2, "The system cannot find the file specified", "docker")
+        return real_run(args, *a, **kw)
+    monkeypatch.setattr(images.subprocess, "run", no_docker)
+    monkeypatch.setattr(envs.subprocess, "run", no_docker)
+    for path in ("/api/harnesses", "/api/imports", "/api/system/deps"):
+        r = client.get(path)
+        assert r.status_code == 200, (path, r.text[:300])
+    assert all(h["status"] == "missing" for h in client.get("/api/harnesses").json())
+    assert envs.image_present("swebench/sweb.eval.x86_64.x:latest") is False
+
+
 def test_unknown_things_are_404(client):
     assert client.get("/api/plans/plan_missing").status_code == 404
     assert client.get("/api/runs/run_missing").status_code == 404

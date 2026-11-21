@@ -21,8 +21,12 @@ _SIZE_UNITS = {"B": 1, "KB": 1e3, "MB": 1e6, "GB": 1e9, "TB": 1e12}
 def image_exists(tag):
     """Image id, unpacked size and creation time, or None. `docker image ls` reports the unpacked size that users
     recognise; `inspect` reports the compressed content size on the containerd store."""
-    p = subprocess.run(["docker", "image", "ls", tag, "--format", "{{.ID}}|{{.Size}}|{{.CreatedAt}}"],
-                       capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW if IS_WIN else 0)
+    try:
+        p = subprocess.run(["docker", "image", "ls", tag, "--format", "{{.ID}}|{{.Size}}|{{.CreatedAt}}"],
+                           capture_output=True, text=True, timeout=60,
+                           creationflags=subprocess.CREATE_NO_WINDOW if IS_WIN else 0)
+    except (OSError, subprocess.TimeoutExpired):     # Docker not installed (or hung): no images, not a crash
+        return None
     line = p.stdout.strip().splitlines()[0] if p.returncode == 0 and p.stdout.strip() else ""
     if not line:
         return None
@@ -127,8 +131,11 @@ def harness_status(h):
 
 
 def remove_image(tag):
-    p = subprocess.run(["docker", "image", "rm", tag], capture_output=True, text=True,
-                       creationflags=subprocess.CREATE_NO_WINDOW if IS_WIN else 0)
+    try:
+        p = subprocess.run(["docker", "image", "rm", tag], capture_output=True, text=True, timeout=120,
+                           creationflags=subprocess.CREATE_NO_WINDOW if IS_WIN else 0)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, f"Docker is not available: {e}"
     return p.returncode == 0, (p.stderr or p.stdout).strip()[-300:]
 
 

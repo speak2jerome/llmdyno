@@ -24,7 +24,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         python: ["3.11", "3.12", "3.13"]
         include:
-          - os: macos-14            # Apple Silicon (M1)
+          - os: macos-latest        # Apple Silicon (GitHub retires numbered macOS images; latest keeps up)
             python: "3.12"
           - os: ubuntu-24.04-arm    # Linux on ARM64
             python: "3.12"

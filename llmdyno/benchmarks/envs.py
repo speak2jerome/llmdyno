@@ -45,7 +45,10 @@ def spec(bench):
 
 
 def image_present(image):
-    return sh(["docker", "image", "inspect", "--format", "{{.Id}}", image], timeout=60).returncode == 0
+    try:
+        return sh(["docker", "image", "inspect", "--format", "{{.Id}}", image], timeout=60).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):     # Docker not installed: nothing is present
+        return False
 
 
 def ensure_image(image, platform, log=print, cancel=None):
