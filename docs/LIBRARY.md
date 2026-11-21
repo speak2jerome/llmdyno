@@ -148,6 +148,40 @@ plan.open()            # the live plan page in the dashboard
 Local models take the GPU one at a time; cloud runs go in parallel (`cloud_concurrency=`). The process stays alive
 until a started plan finishes or is cancelled.
 
+### Following a plan live
+
+`watch()` yields the same events the dashboard shows, until the plan (or run, or job) stops:
+
+```python
+plan = llmdyno.bench(qwen, "suite_quick", wait=False)
+for ev in llmdyno.watch(plan):
+    if ev.kind == "run" and ev.finished:
+        print(ev.data["benchmark_id"], ev.status, ev.data["correctness"])
+    elif ev.kind == "gpu":
+        print("VRAM", ev.data.get("vram_used_mib"))
+```
+
+Event kinds: `run` (a run changed state), `plan`, `gpu` (telemetry samples while a local model runs), `job` and
+`log` (background jobs such as downloads), and with `watch(plan, transcript=True)` also `transcript` (each agent
+event) and `proxy` (each model request with tokens, cost and latency). Or pass a callback to the blocking calls:
+`llmdyno.bench(..., on_event=print)`.
+
+Events arrive live for work started in the same Python process. Work running elsewhere, such as a plan started from
+the dashboard of a separate `llmdyno serve`, is followed by polling: run and plan changes only, every `poll_s` seconds.
+
+### Async code and notebooks
+
+`llmdyno.aio` has every function as a coroutine (each runs in a worker thread), plus an async `watch`:
+
+```python
+from llmdyno import aio
+
+plan = await aio.bench(qwen, "suite_quick", wait=False)
+async for ev in aio.watch(plan):
+    ...
+results = await aio.call(plan.results)      # any blocking method, in a thread
+```
+
 ## Results
 
 ```python
@@ -200,13 +234,21 @@ models onto the same GPU.
 
 ## Errors
 
-| Exception | When |
-|---|---|
-| `llmdyno.PreflightError` | a plan cannot start; `.problems` lists why, `.report` has the full preflight |
-| `llmdyno.NotFoundError` | no such profile, benchmark, plan, file or quant |
-| `llmdyno.ConflictError` | a name or file is ambiguous or already in use |
-| `llmdyno.LLMDynoError` | anything else LLMDyno refuses or fails to do (all of the above inherit from it) |
-| `TypeError` | an unknown profile setting |
+The library and the web API share one error family (`llmdyno.errors`); each carries the HTTP status the API answers
+with, so an error means the same thing from Python and over REST.
+
+| Exception | When | HTTP |
+|---|---|---|
+| `llmdyno.PreflightError` | a plan cannot start; `.problems` lists why, `.report` has the full preflight | 409 |
+| `llmdyno.NotFoundError` | no such profile, benchmark, plan, run, file or quant | 404 |
+| `llmdyno.ConflictError` | a name or file is ambiguous, already in use, or in the wrong state | 409 |
+| `llmdyno.InvalidError` | a request that cannot be valid as given (also a `ValueError`) | 400 |
+| `llmdyno.ForbiddenError` | not allowed, such as editing a built-in benchmark | 403 |
+| `llmdyno.RiskNotAcknowledgedError` | danger warnings need `acknowledge_risks=True` | 428 |
+| `llmdyno.RateLimitError`, `UpstreamError` | an external service limited or failed the request | 429, 502 |
+| `llmdyno.InsufficientStorageError` | not enough disk space, for example for a download | 507 |
+| `llmdyno.LLMDynoError` | anything else LLMDyno refuses or fails to do (all of the above inherit from it) | 400 |
+| `TypeError` | an unknown profile setting | |
 
 ## API at a glance
 
@@ -220,4 +262,17 @@ models onto the same GPU.
 | `bench(models, benchmarks, harnesses, ...)` | `Results` (or `Plan` with `wait=False`) |
 | `list_plans()`, `plan(id)` | `Plan` |
 | `results(plans, weights...)`, `review(plans, judges)` | `Results` |
+| `watch(plan or run or job, transcript=False)` | iterator of `Event` |
+| `job(id)` | `Job` (`.status`, `.progress`, `.log`, `.wait()`, `.cancel()`) |
 | `serve()` | dashboard URL |
+| `llmdyno.aio.<any function>`, `aio.watch()`, `aio.call(fn, ...)` | the same, awaitable |
+
+Every object (`Profile`, `Plan`, `Job`, …) gives its raw data with `obj["field"]`, `obj.get("field")` and
+`obj.to_dict()`, and `obj.refresh()` fetches it again.
+
+## Library and web app parity
+
+Everything the dashboard can do is being brought to the library. `tests/test_parity.py` checks every web API route
+against the library: each one has a library call (marked with `@covers` in `llmdyno/sdk`) or is listed as pending in
+its area's module, and 0.4.0 ships with no pending routes. `python -c "from llmdyno.sdk import parity; print(parity.report())"`
+shows where it stands.

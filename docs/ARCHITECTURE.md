@@ -21,6 +21,9 @@ browser ── React + TS UI (Vite build, served by the backend)
    │  REST + one WebSocket (/ws, topic subscriptions)
    ▼
 llmdyno (FastAPI, runs natively on the host: it needs the GPU, the disk and Docker)
+   ├── api/         thin FastAPI routes: map HTTP to service calls, nothing else
+   ├── services/    what every feature does, one module per area; plain data in and out, llmdyno.errors on failure
+   ├── sdk/         the Python library (import llmdyno) over the same services, through a backend seam
    ├── system/      spec detection (CPU/ISA, RAM, GPUs/VRAM/driver, disk, Docker, WSL) and dependency checks/installers
    ├── hub/         Hugging Face search, remote GGUF header parsing (HTTP range), resumable downloads
    ├── memory.py    VRAM/RAM projection: estimator (pre-download) + llama-fit-params dry run (post-download) + warnings
@@ -37,6 +40,21 @@ llmdyno (FastAPI, runs natively on the host: it needs the GPU, the disk and Dock
 SQLite (data/llmdyno.db) — profiles, providers, plans, runs, reviews, jobs
 data/runs/<plan>/<run>/ — workspace, proxy logs, transcript stream, grader output
 ```
+
+### One set of services, two front ends
+
+The web API and the Python library are two doors into the same code. `llmdyno/services/<area>.py` holds what each
+feature does and returns plain data (a download comes back as `{filename, media_type, content}` or a file path; file
+views as text), raising `llmdyno.errors` with the HTTP status each error means. The routes in `llmdyno/api/` only
+turn HTTP into service calls and back, and one exception handler in `server.py` maps errors to `{"detail": …}`.
+
+The library in `llmdyno/sdk/` calls services by name, `call("runs.run_transcript", rid=...)`, through a backend:
+`LocalBackend` runs them in-process, and a remote backend (planned for 0.6) will send the same call to another
+machine's API, which has the same names and parameters. SDK modules never import the database or engine modules
+(a test enforces it), so every object works the same either way. Live events reach the library through
+`events.add_listener`, which works without the web server; `watch()` falls back to polling for work in another
+process. `tests/test_parity.py` maps every route to the library call that covers it (`@covers`), so a feature can't
+reach the dashboard without reaching Python too.
 
 ### Why no Redis / Celery / Postgres here
 

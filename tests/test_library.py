@@ -10,7 +10,9 @@ from llmdyno import lib
 
 def test_import_is_light_and_lazy():
     code = ("import sys, llmdyno; assert 'llmdyno.lib' not in sys.modules and 'llmdyno.db' not in sys.modules; "
-            "llmdyno.list_benchmarks; assert 'llmdyno.lib' in sys.modules; print('ok')")
+            "llmdyno.list_benchmarks; assert 'llmdyno.lib' in sys.modules; "
+            "heavy = [m for m in ('llmdyno.db', 'llmdyno.services', 'fastapi', 'sqlalchemy') if m in sys.modules]; "
+            "assert not heavy, heavy; print('ok')")
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert out.returncode == 0, out.stderr
     for name in ("bench", "cloud_model", "local_model", "Results", "PreflightError"):
@@ -130,3 +132,95 @@ def test_results_from_the_bundled_sample(tmp_path):
     finally:
         if loaded_here:
             results_api.unload_sample()
+
+
+def test_sdk_modules_only_reach_llmdyno_through_the_backend():
+    """SDK code talks to services via call(), so the same objects work against a remote LLMDyno (0.6)."""
+    import ast
+    import pathlib
+    allowed = {"errors", "__version__"}
+    local_only = {"_backend.py": {"config", "db", "events", "inference"}, "_core.py": {"config"}, "ui.py": {"config"},
+                  "parity.py": {"sdk", "server"}}           # parity reads the local route table
+    sdk = pathlib.Path(llmdyno.__file__).parent / "sdk"
+    for f in sdk.glob("*.py"):
+        for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom) and node.level >= 2:
+                names = {node.module.split(".")[0]} if node.module else {a.name for a in node.names}
+                extra = names - allowed - local_only.get(f.name, set())
+                assert not extra, f"{f.name} imports {extra}; go through call('area.function') instead"
+
+
+def test_every_sdk_call_goes_through_the_installed_backend():
+    from llmdyno.sdk import _backend
+
+    class Canned(_backend.Backend):
+        kind = "canned"
+
+        def __init__(self):
+            self.ops = []
+
+        def call(self, op, **kwargs):
+            self.ops.append(op)
+            return {"profiles.list_profiles": [{"id": "prof_x", "name": "Canned", "kind": "cloud", "params": {}}],
+                    "benchmarks.list_suites": [{"id": "suite_canned"}]}[op]
+
+    fake = Canned()
+    prev = _backend.use(fake)
+    try:
+        assert [p.name for p in llmdyno.list_profiles()] == ["Canned"]
+        assert llmdyno.profile("canned").id == "prof_x"
+        assert llmdyno.list_suites() == [{"id": "suite_canned"}]
+        with pytest.raises(llmdyno.LLMDynoError, match="remote"):
+            llmdyno.init()
+    finally:
+        _backend.use(prev)
+    assert fake.ops == ["profiles.list_profiles", "profiles.list_profiles", "benchmarks.list_suites"]
+
+
+def test_handles_compare_by_kind_and_id():
+    a, b = llmdyno.Job("job_1"), llmdyno.Job("job_1")
+    assert a == b and hash(a) == hash(b) and a != llmdyno.Plan("job_1")
+    with pytest.raises(llmdyno.NotFoundError):
+        llmdyno.job("job_does_not_exist")
+
+
+def test_watch_follows_a_job_live_and_ends_with_it():
+    import time as _t
+
+    from llmdyno import jobs
+
+    def work(ctx):
+        for i in range(3):
+            ctx.log(f"step {i}")
+            ctx.progress((i + 1) / 3, f"step {i}")
+            _t.sleep(0.05)
+        ctx.result = {"answer": 42}
+
+    jid = jobs.submit("test", "Watch test", work)
+    events = list(llmdyno.watch(jid, poll_s=0.2, timeout=20))
+    assert [e.data for e in events if e.kind == "log"][:3] == ["step 0", "step 1", "step 2"]
+    assert events[-1].kind == "job" and events[-1].status == "done" and events[-1].finished
+    assert llmdyno.Job(jid).wait(quiet=True) == {"answer": 42}
+
+
+def test_watch_polls_work_it_cannot_hear():
+    """A job finished before watching (or running in another process) is still reported, by polling."""
+    from llmdyno import jobs
+    jid = jobs.submit("test", "Already done", lambda ctx: None)
+    llmdyno.Job(jid).wait(quiet=True)
+    evs = list(llmdyno.watch(jid, poll_s=0.1, timeout=5))
+    assert len(evs) == 1 and evs[0].status == "done"
+
+
+def test_aio_watch_and_calls():
+    import asyncio
+
+    from llmdyno import aio, jobs
+
+    async def main():
+        jid = jobs.submit("test", "Async watch", lambda ctx: ctx.log("hello"))
+        kinds = [ev.kind async for ev in aio.watch(jid, poll_s=0.1, timeout=10)]
+        suites = await aio.list_suites()
+        return kinds, suites
+    kinds, suites = asyncio.run(main())
+    assert kinds[-1] == "job" and any(s["id"] == "suite_quick" for s in suites)

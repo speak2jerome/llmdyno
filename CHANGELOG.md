@@ -9,6 +9,27 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+### Added
+
+- `llmdyno.watch(plan or run or job)` yields live events (run and plan changes, GPU samples, job progress and, with
+  `transcript=True`, every agent event and model request). `bench()`, `Plan.wait()` and `Plan.resume()` take
+  `on_event=`. Live events no longer need the web server to be running.
+- `llmdyno.aio`: every library function as a coroutine, plus `aio.watch()` and `aio.call()`.
+- `llmdyno.job(id)` and the `Job` object (status, progress, log, `wait()`, `cancel()`).
+- Library objects expose their data: `obj["field"]`, `obj.get()`, `obj.to_dict()` and `obj.refresh()`.
+- The full error family is public: `InvalidError`, `ForbiddenError`, `RiskNotAcknowledgedError`, `RateLimitError`,
+  `UpstreamError` and `InsufficientStorageError` join `NotFoundError`, `ConflictError` and `PreflightError`.
+- A parity test maps every web API route to the library call that covers it, the groundwork for 0.4.0's goal of
+  library and dashboard doing exactly the same things.
+
+### Changed
+
+- Internals: the web API's logic moved into `llmdyno/services` (one module per area) and the library into
+  `llmdyno/sdk`, both over the same services. The HTTP API is unchanged: every endpoint answers with the same status,
+  headers and body as in 0.3.1.
+- `cloud_model()` saves the given or environment API key every time instead of comparing it with the stored one first
+  (same result, and it works without reading the secret store).
+
 ## [0.3.1] - 2026-11-22
 
 ### Added

@@ -18,33 +18,44 @@ from typing import TYPE_CHECKING
 
 __version__ = "0.3.1"
 
-# The public API lives in llmdyno.lib and is loaded on first use, so `import llmdyno` stays instant and starts
-# nothing (no database, no Docker, no web server) until you call something. Public names must never equal a
-# submodule's name (profiles, benchmarks, judge, …): Python would set the module over the function, or the reverse.
-_PUBLIC = (
-    "LLMDynoError", "NotFoundError", "ConflictError", "PreflightError", "Profile", "Plan", "Results", "Doctor",
-    "init", "data_dir", "doctor", "setup", "cloud_model", "local_model", "list_profiles", "profile", "list_benchmarks",
-    "list_suites", "import_swebench", "import_polyglot", "preflight", "bench", "list_plans", "plan", "results", "review",
-    "serve",
-)
-__all__ = ["__version__", *_PUBLIC]
+# The public API is gathered in llmdyno.lib (code in llmdyno/sdk) and loaded on first use, so `import llmdyno` stays
+# instant and starts nothing (no database, no Docker, no web server) until you call something. Public names must
+# never equal a submodule's name (jobs, profiles, benchmarks, judge, …): Python would set the module over the
+# function, or the reverse. tests/test_library.py checks this.
 
 if TYPE_CHECKING:  # pragma: no cover - for IDEs and type checkers
-    from .lib import (  # noqa: F401
-        ConflictError, Doctor, LLMDynoError, NotFoundError, Plan, PreflightError, Profile, Results, bench, cloud_model,
-        data_dir, doctor, import_polyglot, import_swebench, init, list_benchmarks, list_plans, list_profiles, list_suites,
-        local_model, plan, preflight, profile, results, review, serve, setup,
-    )
+    from .lib import *  # noqa: F401,F403
+
+
+def _lib():
+    import importlib
+    return importlib.import_module("llmdyno.lib")
+
+
+def _public() -> list:
+    return _lib().__all__
+
+
+def _is_submodule(name: str) -> bool:
+    import os
+    base = os.path.join(os.path.dirname(__file__), name)
+    return os.path.isdir(base) or os.path.isfile(base + ".py")
 
 
 def __getattr__(name):
-    if name in _PUBLIC:
-        from . import lib
-        value = getattr(lib, name)
-        globals()[name] = value
-        return value
+    if name == "__all__":                                    # for `from llmdyno import *` and the tests
+        return ["__version__", *_public()]
+    if name in ("aio", "errors"):                            # public submodules: llmdyno.aio without importing it
+        import importlib
+        return importlib.import_module(f"llmdyno.{name}")
+    if not name.startswith("_") and not _is_submodule(name):   # `from llmdyno import db` must not load the API
+        lib = _lib()
+        if name in lib.__all__:
+            value = getattr(lib, name)
+            globals()[name] = value
+            return value
     raise AttributeError(f"module 'llmdyno' has no attribute {name!r}")
 
 
 def __dir__():
-    return sorted(set(globals()) | set(_PUBLIC))
+    return sorted(set(globals()) | set(_public()))
