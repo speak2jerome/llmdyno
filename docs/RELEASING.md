@@ -47,3 +47,9 @@ things are set up (both one-time, no token is stored):
 2. In the GitHub repository settings, add the variable `PUBLISH_PYPI` with the value `true`.
 
 Until then the PyPI job is skipped and releases go to GitHub only.
+
+## Documentation site
+
+`.github/workflows/docs.yml` builds the site with MkDocs (`mkdocs build --strict`) on every push to `main` that touches
+the docs or the library, and publishes it to GitHub Pages. One-time setup: in the repository's Settings → Pages, set
+"Source" to "GitHub Actions". To preview locally: `pip install -e ".[docs]"` then `mkdocs serve`.

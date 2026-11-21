@@ -1,9 +1,10 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Agent harnesses: built-in and custom, images, Dockerfiles, previews and portable runtimes."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 from ..errors import LLMDynoError, NotFoundError
 from ._core import Handle, Job, call, covers
@@ -22,14 +23,14 @@ class Harness(Handle):
     @property
     def status(self) -> str:
         """ready (image built), building, failed or missing (fetched fresh)."""
-        return self.refresh()._d["status"]
+        return self._fresh()["status"]
 
     @property
     def builtin(self) -> bool:
         return bool(self._data.get("builtin", True))
 
     @property
-    def apis(self) -> list:
+    def apis(self) -> list[Any]:
         """API styles it can talk: openai-chat, openai-responses, anthropic."""
         return list(self._data.get("apis") or [])
 
@@ -60,25 +61,25 @@ class Harness(Handle):
         return call("harnesses.harness_dockerfile", hid=self.id)
 
     @covers("GET /api/harnesses/{hid}/preview")
-    def preview(self, api_style: str = "openai-chat") -> dict:
+    def preview(self, api_style: str = "openai-chat") -> dict[str, Any]:
         """Exactly what a run would execute, for a sample endpoint: config files written into the agent's HOME,
         environment, the first command and the command that continues a multi-stage task."""
         return call("harnesses.harness_preview", hid=self.id, api_style=api_style)
 
     @covers("GET /api/harnesses/{hid}/runtime")
-    def runtime(self, platform: str = "") -> dict:
+    def runtime(self, platform: str = "") -> dict[str, Any]:
         """Its portable runtime (used inside benchmarks that bring their own image, such as SWE-bench) for a platform
         ("linux/amd64", "linux/arm64"; default this machine's): whether it is built, plus its Dockerfile."""
         return call("harnesses.harness_runtime", hid=self.id, platform=platform)
 
     @covers("POST /api/harnesses/{hid}/runtime")
-    def build_runtime(self, platform: str = "", wait: bool = True, quiet: bool = False) -> Union[dict, Job]:
+    def build_runtime(self, platform: str = "", wait: bool = True, quiet: bool = False) -> Union[dict[str, Any], Job]:
         """Build the portable runtime for a platform. Returns its status, or the Job with wait=False."""
         job = Job(call("harnesses.build_harness_runtime", hid=self.id, body={"platform": platform})["job_id"])
         return job.wait(quiet=quiet) if wait else job
 
     @covers("PUT /api/harnesses/custom/{hid}")
-    def update(self, manifest: Union[dict, str, Path]) -> "Harness":
+    def update(self, manifest: Union[dict[str, Any], str, Path]) -> "Harness":
         """Replace a custom harness's manifest (rebuild afterwards for image changes to take effect)."""
         self._own()
         call("harnesses.update_custom_harness", hid=self.id, body=_manifest(manifest))
@@ -99,12 +100,12 @@ class Harness(Handle):
         return f"<llmdyno.Harness {self.id} {d.get('version', '')} {d.get('status', '')}>".replace("  ", " ")
 
 
-def _manifest(m: Union[dict, str, Path]) -> dict:
+def _manifest(m: Union[dict[str, Any], str, Path]) -> dict[str, Any]:
     return dict(m) if isinstance(m, dict) else json.loads(Path(m).expanduser().read_text(encoding="utf-8"))
 
 
 @covers("GET /api/harnesses")
-def list_harnesses(ready: bool | None = None) -> list:
+def list_harnesses(ready: bool | None = None) -> list[Any]:
     """Built-in and custom harnesses with their image status; ready=True keeps the ones whose image is built."""
     rows = call("harnesses.list_harnesses")
     return [Harness(h) for h in rows if ready is None or (h["status"] == "ready") == ready]
@@ -123,15 +124,17 @@ def harness(id_or_name: Union[str, Harness]) -> Harness:
 
 
 @covers("POST /api/harnesses/custom")
-def add_harness(manifest: Union[dict, str, Path], build: bool = False, quiet: bool = False) -> Harness:
+def add_harness(manifest: Union[dict[str, Any], str, Path], build: bool = False, quiet: bool = False) -> Harness:
     """Add your own harness from a manifest (a dict or a JSON file; see harness_schema() and docs/HARNESSES.md):
     id, name, install lines (Dockerfile instructions), the command with $PROMPT, config files, API styles.
     build=True builds its image right away."""
     h = Harness(call("harnesses.add_custom_harness", body=_manifest(manifest)))
-    return h.build(quiet=quiet) if build else h
+    if build:
+        h.build(quiet=quiet)
+    return h.refresh()
 
 
 @covers("GET /api/harnesses-schema")
-def harness_schema() -> dict:
+def harness_schema() -> dict[str, Any]:
     """The JSON schema of a custom harness manifest."""
     return call("harnesses.harness_schema")

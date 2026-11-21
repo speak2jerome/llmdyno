@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Drive LLMDyno on another machine: every library call goes to its web API, so the same code works on a laptop
 against the GPU box down the hall.
 
@@ -11,6 +12,8 @@ network, behind HTTPS, or reach it through an SSH tunnel (ssh -L 8777:localhost:
 (cloud_model(api_key=...)) are sent to the server once and stored there; they never come back over the API."""
 from __future__ import annotations
 
+from typing import Any
+
 import inspect
 import json
 import os
@@ -20,14 +23,14 @@ from urllib.parse import quote
 
 from .. import __version__
 from ..errors import LLMDynoError, http
-from ._backend import Backend, Subscription, _current, _switch, backend, use
+from ._backend import Backend, Subscription, backend, reset, use
 
 __all__ = ["RemoteBackend", "connect", "disconnect", "connection"]
 
-_ROUTES: dict = {}
+_ROUTES: dict[str, Any] = {}
 
 
-def route_table() -> dict:
+def route_table() -> dict[str, Any]:
     """service operation -> (method, path, {parameter: "path" | "query" | "body"}), read from the API's own routes so
     it always matches this version (the server's routes call services with the same parameter names)."""
     if _ROUTES:
@@ -57,8 +60,9 @@ class RemoteBackend(Backend):
     """Runs every call on a LLMDyno server through its web API (httpx), and follows live events over its WebSocket."""
 
     kind = "remote"
+    server: dict[str, Any]
 
-    def __init__(self, url: str, token: str | None = None, *, client=None, timeout: float = 120.0,
+    def __init__(self, url: str, token: str | None = None, *, client: Any=None, timeout: float = 120.0,
                  verify: bool = True):
         import httpx
         self.url = url.rstrip("/")
@@ -70,12 +74,13 @@ class RemoteBackend(Backend):
             client.headers.update(headers)
         self.http = client
         self.routes = route_table()
+        self.server = {}
 
     def __repr__(self):
         return f"<llmdyno backend remote {self.url}>"
 
     # -- calls
-    def call(self, op: str, **kwargs):
+    def call(self, op: str, **kwargs: Any):
         if op not in self.routes:
             raise LLMDynoError(f"{op} is not available over the web API")
         method, path, where = self.routes[op]
@@ -96,7 +101,7 @@ class RemoteBackend(Backend):
         return self._result(r)
 
     @staticmethod
-    def _result(r):
+    def _result(r: Any):
         ctype = r.headers.get("content-type", "")
         if r.status_code >= 400:
             detail = None
@@ -117,11 +122,11 @@ class RemoteBackend(Backend):
             return r.json()
         return r.text
 
-    def health(self) -> dict:
+    def health(self) -> Any:
         return self._result(self.http.get("/api/health"))
 
     # -- live events over the WebSocket
-    def subscribe(self, fn, wanted, names=()):
+    def subscribe(self, fn: Any, wanted: Any, names: Any=()):
         try:
             return _WsSubscription(self, fn, wanted, list(names))
         except Exception:  # noqa: BLE001 - no WebSocket (a proxy that blocks it, say): watch() polls instead
@@ -135,7 +140,7 @@ class RemoteBackend(Backend):
 class _WsSubscription(Subscription):
     """A thread reading the server's WebSocket and passing wanted events on."""
 
-    def __init__(self, remote: RemoteBackend, fn, wanted, names: list):
+    def __init__(self, remote: RemoteBackend, fn: Any, wanted: Any, names: list[Any]):
         super().__init__()
         self.fn, self.wanted, self.stop = fn, wanted, threading.Event()
         self.lock = threading.Lock()
@@ -156,7 +161,7 @@ class _WsSubscription(Subscription):
         self.thread = threading.Thread(target=self._read, daemon=True, name="llmdyno-remote-events")
         self.thread.start()
 
-    def add_many(self, topics: list) -> None:
+    def add_many(self, topics: list[Any]) -> None:
         with self.lock:
             self._send(json.dumps({"sub": list(topics)}))
 
@@ -185,7 +190,7 @@ class _WsSubscription(Subscription):
 
 
 def connect(url: str | None = None, token: str | None = None, *, timeout: float = 120.0, verify: bool = True,
-            client=None) -> RemoteBackend:
+            client: Any=None) -> RemoteBackend:
     """Send every later llmdyno call to the LLMDyno server at url (default LLMDYNO_URL), authenticating with its
     access token (default LLMDYNO_TOKEN; not needed on the server's own machine). Returns the connection."""
     url = url or os.environ.get("LLMDYNO_URL")
@@ -216,8 +221,7 @@ def connect(url: str | None = None, token: str | None = None, *, timeout: float 
 
 def disconnect() -> None:
     """Go back to running everything on this machine."""
-    with _switch:
-        _current["backend"] = None
+    reset()
 
 
 def connection() -> Backend:

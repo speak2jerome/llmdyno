@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Which library call gives access to each web API route, so the Python library can do everything the web app does.
 
 SDK functions declare the routes they cover with @covers("METHOD /path"). Routes not covered yet are listed in
@@ -5,6 +6,8 @@ PENDING_ROUTES in the SDK module of their area. tests/test_parity.py fails when 
 when a pending route is already covered, or when @covers names a route that does not exist. Release 0.4.0 needs every
 PENDING_ROUTES list empty."""
 from __future__ import annotations
+
+from typing import Any
 
 import importlib
 import pkgutil
@@ -31,10 +34,11 @@ def app_routes() -> set[str]:
     out = set()
     for r in app.routes:
         methods = getattr(r, "methods", None)
+        path = getattr(r, "path", "")
         if methods is None:
-            out.add(f"WS {r.path}")
+            out.add(f"WS {path}")
             continue
-        out |= {f"{m} {r.path}" for m in methods if m != "HEAD"}
+        out |= {f"{m} {path}" for m in methods if m != "HEAD"}
     return out
 
 
@@ -55,7 +59,7 @@ def pending() -> dict[str, str]:
     return out
 
 
-def report() -> dict:
+def report() -> dict[str, Any]:
     """{"covered": {...}, "pending": {...}, "missing": [...], "exempt": {...}} for the whole API."""
     routes = app_routes() - NOT_API
     cov, pend = coverage(), pending()

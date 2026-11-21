@@ -19,7 +19,7 @@ def get_deps(refresh: bool = False):
 
 def dep_action(dep_id: str, body: dict | None = None):
     body = {} if body is None else body
-    action = body.get("action")
+    action = str(body.get("action") or "")
     if action == "start_docker":
         deps.start_docker_desktop()
         return {"ok": True, "message": "Docker Desktop is starting; this takes about a minute."}

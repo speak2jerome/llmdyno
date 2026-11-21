@@ -19,6 +19,11 @@ def client():
     mp.undo()
 
 
+def test_dependency_action_without_an_action_is_a_clear_400(client):
+    r = client.post("/api/system/deps/docker/action", json={})
+    assert r.status_code == 400 and "unknown action" in r.json()["detail"]
+
+
 def test_health_reports_version(client):
     h = client.get("/api/health").json()
     assert h["ok"] and h["version"] == __version__ and h["schema_version"] >= 1

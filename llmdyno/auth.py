@@ -62,7 +62,9 @@ def presented(headers, query) -> str | None:
 
 def check(given: str | None) -> bool:
     tok = token()
-    return bool(tok and given) and hmac.compare_digest(tok.encode(), str(given).encode())
+    if not tok or not given:
+        return False
+    return hmac.compare_digest(tok.encode(), str(given).encode())
 
 
 def log_request(client: str | None, method: str, path: str, status: int) -> None:

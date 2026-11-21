@@ -1,8 +1,13 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Errors raised by LLMDyno's services and Python API.
 
 Every error carries the HTTP status the web API answers with, so the same exception means the same thing whether you
 call `llmdyno.bench()` from Python or POST /api/plans: one handler in server.py turns it into {"detail": message}.
 All of them inherit from LLMDynoError; catch that to handle anything LLMDyno refuses or fails to do."""
+
+from __future__ import annotations
+
+from typing import Any, Iterable
 
 
 class LLMDynoError(Exception):
@@ -54,7 +59,8 @@ class PreflightError(LLMDynoError):
     """A plan cannot start. `problems` are the blocking items, `warnings` the rest of the preflight report."""
     status = 409
 
-    def __init__(self, problems, warnings=None, report=None):
+    def __init__(self, problems: Iterable[str], warnings: Iterable[str] | None = None,
+                 report: dict[str, Any] | None = None):
         self.problems, self.warnings, self.report = list(problems), list(warnings or []), report or {}
         super().__init__("the plan cannot start:\n  - " + "\n  - ".join(self.problems))
 
@@ -84,7 +90,7 @@ def from_exception(exc: BaseException) -> LLMDynoError | None:
     return None
 
 
-def http(status: int, detail) -> LLMDynoError:
+def http(status: int, detail: object) -> LLMDynoError:
     """The error class for an HTTP status, with that message (services use this where the web API used
     HTTPException, so status codes and messages stay exactly as they were)."""
     err = _BY_STATUS.get(int(status), LLMDynoError)(str(detail))

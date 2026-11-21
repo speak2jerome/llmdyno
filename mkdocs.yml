@@ -1,0 +1,87 @@
+site_name: LLMDyno
+site_description: Benchmark local and cloud LLMs as coding agents, from a dashboard or Python.
+site_url: https://speak2jerome.github.io/llmdyno/
+repo_url: https://github.com/speak2jerome/llmdyno
+repo_name: speak2jerome/llmdyno
+edit_uri: edit/main/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  logo: images/logo.svg
+  favicon: images/logo.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle: {icon: material/weather-night, name: Dark theme}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle: {icon: material/weather-sunny, name: Light theme}
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Guides:
+      - Python library and CLI: LIBRARY.md
+      - Integrations: INTEGRATIONS.md
+      - Remote mode: REMOTE.md
+      - Benchmarks: BENCHMARKS.md
+      - Harnesses: HARNESSES.md
+  - API reference:
+      - Overview: reference/index.md
+      - Setup, system and jobs: reference/system.md
+      - Profiles: reference/profiles.md
+      - Models: reference/models.md
+      - Providers: reference/providers.md
+      - Harnesses and agents: reference/harnesses.md
+      - Benchmarks and suites: reference/benchmarks.md
+      - Plans: reference/plans.md
+      - Runs and transcripts: reference/runs.md
+      - Results: reference/results.md
+      - Judging: reference/judging.md
+      - Live events and async: reference/live.md
+      - Remote mode: reference/remote.md
+      - Settings and references: reference/settings.md
+      - Interop and CI: reference/interop.md
+      - Errors: reference/errors.md
+  - Project:
+      - Architecture: ARCHITECTURE.md
+      - Releasing: RELEASING.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            filters: ["!^_", "!^PENDING_ROUTES$"]
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            docstring_style: google
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.inlinehilite

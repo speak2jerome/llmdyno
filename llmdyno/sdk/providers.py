@@ -1,7 +1,8 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Cloud providers: vendors, keys, budgets and spend, connection tests and price lookup."""
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Union
 
 import os
 import re
@@ -32,7 +33,7 @@ class Provider(Handle):
     @property
     def spent_usd(self) -> float:
         """Spend recorded against the budget (fetched fresh)."""
-        return self.refresh()._d["spent_usd"]
+        return self._fresh()["spent_usd"]
 
     @property
     def has_key(self) -> bool:
@@ -46,13 +47,13 @@ class Provider(Handle):
         return self
 
     @covers("POST /api/providers/{pid}/test")
-    def test(self) -> dict:
+    def test(self) -> dict[str, Any]:
         """Check the key and endpoint by listing models: {"ok", "error", "models", "latency_ms"}."""
         out = call("providers.test_provider", pid=self.id)
         self.refresh()
         return out
 
-    def models(self, refresh: bool = False) -> list:
+    def models(self, refresh: bool = False) -> list[Any]:
         """Model ids this provider offers (from the last connection test; refresh=True tests again)."""
         cached = self._data.get("models_cache") or []
         if refresh or not cached:
@@ -97,7 +98,7 @@ class Provider(Handle):
 
 
 @covers("GET /api/providers")
-def list_providers(vendor: str | None = None) -> list:
+def list_providers(vendor: str | None = None) -> list[Any]:
     """Your cloud providers (optionally of one vendor)."""
     return [Provider(p) for p in call("providers.list_providers") if vendor in (None, p["vendor"])]
 
@@ -128,13 +129,13 @@ def add_provider(vendor: str, *, api_key: str | None = None, name: str | None = 
 
 
 @covers("GET /api/vendors")
-def vendors() -> list:
+def vendors() -> list[Any]:
     """Supported vendors with their API styles, endpoints, where to get a key and notes."""
     return call("providers.list_vendors")
 
 
 @covers("GET /api/pricing/lookup")
-def lookup_price(vendor: str, model: str) -> dict | None:
+def lookup_price(vendor: str, model: str) -> dict[str, Any] | None:
     """Price per 1M tokens ({"input", "output", "cached"}, plus context length and the matched model) from
     OpenRouter's catalog, or None when the model is not found."""
     return call("providers.pricing_lookup", vendor=vendor, model=model)["match"]
@@ -142,7 +143,7 @@ def lookup_price(vendor: str, model: str) -> dict | None:
 
 # ------------------------------------------------------------------ servers on your own machine, gateways
 @covers("GET /api/providers/local-servers")
-def local_servers() -> list:
+def local_servers() -> list[Any]:
     """OpenAI-compatible servers running on the machine LLMDyno runs on (Ollama, LM Studio, vLLM, SGLang, a
     llama.cpp server, a LiteLLM proxy), each with its URL, the URL the sandbox uses, and its models."""
     return call("providers.local_servers")
@@ -153,7 +154,7 @@ def _docker_url(url: str) -> str:
     return re.sub(r"//(localhost|127\.0\.0\.1|0\.0\.0\.0)(?=[:/])", "//host.docker.internal", url.rstrip("/"))
 
 
-def ollama_model(model: str, *, name: str | None = None, **params):
+def ollama_model(model: str, *, name: str | None = None, **params: Any):
     """A model served by Ollama on this machine, as a profile: ollama_model("qwen3-coder:30b", ctx=65536).
     Ollama must be running (it is found on its usual port, 11434)."""
     from .profiles import cloud_model
@@ -168,7 +169,7 @@ def ollama_model(model: str, *, name: str | None = None, **params):
 
 
 def openai_compatible(base_url: str, model: str | None = None, *, api_key: str | None = None, name: str | None = None,
-                      api_style: str | None = None, **params):
+                      api_style: str | None = None, **params: Any):
     """Any OpenAI-compatible endpoint as a profile: LM Studio, vLLM, SGLang, a llama.cpp server, a gateway.
     localhost URLs are rewritten so the sandbox can reach them. Without model=, the endpoint must serve exactly one
     (it is looked up among local_servers())."""
@@ -179,14 +180,14 @@ def openai_compatible(base_url: str, model: str | None = None, *, api_key: str |
         models = hit["models"] if hit else []
         if len(models) != 1:
             raise LLMDynoError(f"pass model=; {base_url} serves {', '.join(models) or 'nothing LLMDyno can see'}")
-        model = models[0]
+        model = str(models[0])
     return cloud_model("custom", model, base_url=url, api_key=api_key, api_style=api_style,
                        name=name or f"{model} · {re.sub(r'^https?://', '', base_url).rstrip('/')}", pricing=None,
                        **params)
 
 
 def litellm_model(model: str, *, base_url: str | None = None, api_key: str | None = None, name: str | None = None,
-                  budget_usd: float | None = None, pricing="auto", **params):
+                  budget_usd: float | None = None, pricing: Any="auto", **params: Any):
     """A model behind a LiteLLM proxy (Azure OpenAI, Bedrock, Vertex AI, … through one OpenAI-compatible endpoint):
     litellm_model("bedrock/anthropic.claude-sonnet-4-5", reasoning_effort="low"). Start the proxy yourself, e.g.
     `litellm --model bedrock/...` or `litellm --config config.yaml` (pip install "litellm[proxy]"); base_url defaults

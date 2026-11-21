@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Where SDK calls go.
 
 Every SDK call is `call("area.function", **kwargs)`: a function in llmdyno/services with its parameters by name. The
@@ -14,6 +15,9 @@ import atexit
 import importlib
 import threading
 from pathlib import Path
+from typing import Any, Callable, Sequence
+
+Message = dict[str, Any]
 
 
 class Backend:
@@ -21,17 +25,18 @@ class Backend:
 
     kind = "abstract"
 
-    def call(self, op: str, **kwargs):
+    def call(self, op: str, **kwargs: Any) -> Any:
         """Run the service function `op` ("area.function") with keyword arguments and return its result."""
         raise NotImplementedError
 
-    def subscribe(self, fn, wanted, names=()):
+    def subscribe(self, fn: Callable[[Message], None], wanted: Callable[[str], bool],
+                  names: Sequence[str] = ()) -> "Subscription | None":
         """Call fn(msg) for live events whose topic passes wanted(topic). names are the topics to ask for (a remote
         server sends only what was asked for); more can be added later with the returned Subscription's add().
         A backend without live events returns None and watch() falls back to polling."""
         return None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<llmdyno backend {self.kind}>"
 
 
@@ -40,11 +45,11 @@ class LocalBackend(Backend):
 
     kind = "local"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ready = False
         self._lock = threading.Lock()
 
-    def start(self, data_dir=None) -> Path:
+    def start(self, data_dir: str | Path | None = None) -> Path:
         """Open (and create if needed) the data folder; with a folder, switch to it."""
         from .. import config, db
         with self._lock:
@@ -55,7 +60,12 @@ class LocalBackend(Backend):
             _register_exit_hook()
         return config.DATA
 
-    def call(self, op: str, **kwargs):
+    @property
+    def ready(self) -> bool:
+        """Whether the data folder is open."""
+        return self._ready
+
+    def call(self, op: str, **kwargs: Any) -> Any:
         if not self._ready:
             self.start()
         fn = resolve(op)
@@ -68,7 +78,8 @@ class LocalBackend(Backend):
                 raise
             raise err from e
 
-    def subscribe(self, fn, wanted, names=()):
+    def subscribe(self, fn: Callable[[Message], None], wanted: Callable[[str], bool],
+                  names: Sequence[str] = ()) -> "Subscription | None":
         """In-process events: plans, downloads and reviews started from this process publish here directly.
         (Work running in another process, such as a separate web server, is seen by watch() through polling.)"""
         from .. import events
@@ -76,7 +87,7 @@ class LocalBackend(Backend):
         return Subscription(close=lambda: events.remove_listener(fn))
 
 
-def resolve(op: str):
+def resolve(op: str) -> Callable[..., Any]:
     """The service function behind "area.function"."""
     area, _, name = op.partition(".")
     if not name or area.startswith("_") or name.startswith("_"):
@@ -87,7 +98,7 @@ def resolve(op: str):
 class Subscription:
     """A live-event subscription: add(topic) asks for one more topic, close() ends it."""
 
-    def __init__(self, close=None, add=None):
+    def __init__(self, close: Callable[[], None] | None = None, add: Callable[[str], None] | None = None) -> None:
         self._close, self._add = close, add
 
     def add(self, topic: str) -> None:
@@ -103,13 +114,13 @@ class Subscription:
 _exit_hook = {"done": False}
 
 
-def _register_exit_hook():
+def _register_exit_hook() -> None:
     """Stop a llama-server this process started when the interpreter exits."""
     if _exit_hook["done"]:
         return
     _exit_hook["done"] = True
 
-    def stop():
+    def stop() -> None:
         try:
             from ..inference import llamacpp
             llamacpp.server.stop(force=True)
@@ -118,7 +129,7 @@ def _register_exit_hook():
     atexit.register(stop)
 
 
-_current: dict = {"backend": None}
+_current: dict[str, Backend | None] = {"backend": None}
 _switch = threading.Lock()
 
 
@@ -133,15 +144,21 @@ def backend() -> Backend:
     return b
 
 
-def use(b: Backend) -> Backend:
+def use(b: Backend) -> Backend | None:
     """Install a backend for every later SDK call; returns the previous one."""
-    if not isinstance(b, Backend):
+    if not isinstance(b, Backend):  # pyright: ignore[reportUnnecessaryIsInstance] - callers may not be typed
         raise TypeError("use() takes a Backend")
     with _switch:
         prev, _current["backend"] = _current["backend"], b
     return prev
 
 
-def call(op: str, **kwargs):
+def reset() -> None:
+    """Forget the installed backend: the next call starts a LocalBackend again."""
+    with _switch:
+        _current["backend"] = None
+
+
+def call(op: str, **kwargs: Any) -> Any:
     """Run a service operation through the current backend."""
     return backend().call(op, **kwargs)

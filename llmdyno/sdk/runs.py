@@ -1,10 +1,11 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Runs: details, transcripts, workspace files, logs, GPU telemetry, cancel, retry and re-grade."""
 from __future__ import annotations
 
 import json
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import Any, TYPE_CHECKING, Union
 
 from ._core import Handle, Job, call, covers
 
@@ -14,15 +15,15 @@ if TYPE_CHECKING:  # pragma: no cover
 __all__ = ["Run", "Transcript", "run"]
 
 
-class Transcript(list):
+class Transcript(list[dict[str, Any]]):
     """A run's transcript: every event LLMDyno's proxy recorded between the agent and the model, in order. The list
     holds the raw events ("request", "block_start", "delta", "response"); the methods give the usual views."""
 
-    def _pairs(self):
+    def _pairs(self) -> list[tuple[dict[str, Any] | None, dict[str, Any]]]:
         reqs = {e.get("seq"): e for e in self if e.get("ev") == "request"}
         return [(reqs.get(e.get("seq")), e) for e in self if e.get("ev") == "response"]
 
-    def turns(self) -> list:
+    def turns(self) -> list[Any]:
         """One dict per model call: the new messages sent ("messages": tool results, the user prompt), the reply's
         blocks (thinking, text, tool calls), why it stopped, token usage, time to first token, time and cost."""
         out = []
@@ -32,7 +33,7 @@ class Transcript(list):
                         "wall_s": resp.get("wall_s"), "cost_usd": resp.get("cost_usd"), "t": resp.get("t")})
         return out
 
-    def tool_calls(self) -> list:
+    def tool_calls(self) -> list[Any]:
         """Every tool call the agent made: {"seq", "id", "name", "args" (parsed), "result" (what the tool returned)}."""
         results = {}
         for e in self:
@@ -53,7 +54,7 @@ class Transcript(list):
                                   "result": results.get(b.get("id"))})
         return calls
 
-    def thinking(self) -> list:
+    def thinking(self) -> list[Any]:
         """The model's reasoning text for each call that had any."""
         return ["".join(b.get("text") or "" for b in resp.get("blocks") or [] if b.get("type") == "thinking")
                 for _, resp in self._pairs()
@@ -66,7 +67,7 @@ class Transcript(list):
             return ""
         return "".join(b.get("text") or "" for b in pairs[-1][1].get("blocks") or [] if b.get("type") == "text")
 
-    def usage(self) -> dict:
+    def usage(self) -> dict[str, Any]:
         """Totals over the run: model calls, input / cached / output / reasoning tokens, cost and model time."""
         tot = {"calls": 0, "input": 0, "cached": 0, "output": 0, "reasoning": 0, "cost_usd": 0.0, "wall_s": 0.0}
         for _, resp in self._pairs():
@@ -78,7 +79,7 @@ class Transcript(list):
             tot["wall_s"] += resp.get("wall_s") or 0
         return tot
 
-    def _turn_rows(self) -> list:
+    def _turn_rows(self) -> list[Any]:
         rows = []
         for t in self.turns():
             row = {k: t[k] for k in ("seq", "finish", "ttft_s", "wall_s", "cost_usd", "t")}
@@ -110,14 +111,14 @@ class Run(Handle):
     @property
     def status(self) -> str:
         """queued, running, grading, done, failed, cancelled or skipped (fetched fresh)."""
-        return self.refresh()._d["status"]
+        return self._fresh()["status"]
 
     @property
     def correctness(self) -> float | None:
         return self._data.get("correctness")
 
     @property
-    def reviews(self) -> list:
+    def reviews(self) -> list[Any]:
         """LLM-judge reviews of this run."""
         return list(self._data.get("reviews") or [])
 
@@ -135,12 +136,12 @@ class Run(Handle):
         return Transcript(call("runs.run_transcript", rid=self.id, start=start, limit=limit)["events"])
 
     @covers("GET /api/runs/{rid}/proxy")
-    def requests(self) -> list:
+    def requests(self) -> list[Any]:
         """Each model request through LLMDyno's proxy: tokens, timings, time to first token, cost, finish reason."""
         return call("runs.run_proxy", rid=self.id)
 
     @covers("GET /api/runs/{rid}/files")
-    def files(self, home: bool = False) -> list:
+    def files(self, home: bool = False) -> list[Any]:
         """Files the agent left in its workspace (home=True: the agent's home folder, with its config and sessions):
         [{"path", "size", "mtime"}]."""
         return call("runs.run_files", rid=self.id, root="home" if home else "workspace")
@@ -161,7 +162,7 @@ class Run(Handle):
         return call("runs.run_log", rid=self.id, name="server")
 
     @covers("GET /api/runs/{rid}/gpu")
-    def gpu(self, max_points: int = 600) -> list:
+    def gpu(self, max_points: int = 600) -> list[Any]:
         """GPU telemetry samples taken while the run was going (utilisation, VRAM, power, temperature)."""
         return call("runs.run_gpu", rid=self.id, max_points=max_points)
 

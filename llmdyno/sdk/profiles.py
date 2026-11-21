@@ -1,13 +1,14 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """LLM profiles: a model plus the exact settings it is benchmarked with. cloud_model() and local_model() make them."""
 from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 from ..errors import ConflictError, LLMDynoError, NotFoundError
-from ._core import Handle, Job, _say, call, covers
+from ._core import Handle, Job, say, call, covers
 
 __all__ = ["Profile", "list_profiles", "profile", "cloud_model", "local_model", "import_profile",
            "profile_defaults"]
@@ -44,11 +45,11 @@ class Profile(Handle):
         return self._data["kind"]
 
     @property
-    def params(self) -> dict:
+    def params(self) -> dict[str, Any]:
         return dict(self._data.get("params") or {})
 
     @property
-    def info(self) -> dict:
+    def info(self) -> dict[str, Any]:
         """Everything the app knows about the profile (model, provider, last test, …)."""
         return self.to_dict()
 
@@ -63,19 +64,19 @@ class Profile(Handle):
 
     # -- actions
     @covers("PATCH /api/profiles/{pid}")
-    def update(self, *, name: str | None = None, notes: str | None = None, tags: list | None = None,
-               pricing: dict | None = None, remote_model: str | None = None, **params) -> "Profile":
+    def update(self, *, name: str | None = None, notes: str | None = None, tags: list[Any] | None = None,
+               pricing: dict[str, Any] | None = None, remote_model: str | None = None, **params: Any) -> "Profile":
         """Change settings, e.g. update(ctx=32768, cache_k="q4_0") or update(reasoning_effort="high"), and the
         name, notes, tags, pricing ({"input", "output", "cached"} USD per 1M tokens) or a cloud profile's model."""
         body = {k: v for k, v in (("name", name), ("notes", notes), ("tags", tags), ("pricing", pricing),
                                   ("remote_model", remote_model)) if v is not None}
         if params:
-            body["params"] = _params(self.kind, params)
+            body["params"] = profile_params(self.kind, params)
         self._d = call("profiles.patch_profile", pid=self.id, body=body)
         return self
 
     @covers("POST /api/profiles/check")
-    def check(self, exact: bool = False) -> dict:
+    def check(self, exact: bool = False) -> dict[str, Any]:
         """Memory fit for a local profile: verdict ("fits", "tight", "spill", "oom", …), projected GPU memory and
         warnings. exact=True asks llama-fit-params instead of estimating (needs llama.cpp and the downloaded file)."""
         if self.kind != "local":
@@ -84,7 +85,7 @@ class Profile(Handle):
                                                     "exact": exact, "profile_id": self.id})
 
     @covers("POST /api/profiles/{pid}/smoke")
-    def test(self, quiet: bool = False) -> dict:
+    def test(self, quiet: bool = False) -> dict[str, Any]:
         """Quick test (about 20 s locally): loads the model, measures speed and VRAM, and checks tool calling."""
         res = Job(call("profiles.smoke_profile", pid=self.id)["job_id"]).wait(quiet=quiet)
         self.refresh()
@@ -95,18 +96,18 @@ class Profile(Handle):
         call("profiles.delete_profile", pid=self.id)
 
     @covers("POST /api/profiles/{pid}/duplicate")
-    def duplicate(self, name: str | None = None, **params) -> "Profile":
+    def duplicate(self, name: str | None = None, **params: Any) -> "Profile":
         """A copy ("<name> (copy)" unless you name it), optionally with changed settings."""
         copy = Profile(call("profiles.duplicate_profile", pid=self.id))
         patch = {}
         if name:
             patch["name"] = name
         if params:
-            patch["params"] = _params(self.kind, params)
+            patch["params"] = profile_params(self.kind, params)
         return Profile(call("profiles.patch_profile", pid=copy.id, body=patch)) if patch else copy
 
     @covers("GET /api/profiles/{pid}/export")
-    def export(self, path: Union[str, Path, None] = None) -> dict:
+    def export(self, path: Union[str, Path, None] = None) -> dict[str, Any]:
         """The profile as a shareable file (settings, pricing and which model or vendor, never keys); written to
         path if given. import_profile() reads it back, here or on another machine."""
         d = call("profiles.export_profile", pid=self.id)
@@ -115,9 +116,10 @@ class Profile(Handle):
         return json.loads(d["content"])
 
 
-def _params(kind, given):
+def profile_params(kind: str, given: dict[str, Any]) -> dict[str, Any]:
     """Library keyword arguments -> the profile params dict (unknown names are rejected, not ignored)."""
-    out, sampling = {}, {}
+    out: dict[str, Any] = {}
+    sampling: dict[str, Any] = {}
     allowed = LOCAL_PARAM_NAMES if kind == "local" else CLOUD_PARAM_NAMES
     for k, v in given.items():
         if v is None:
@@ -135,12 +137,15 @@ def _params(kind, given):
     return out
 
 
+_params = profile_params        # the 0.3 name, kept for code that used it
+
+
 def _profile_rows():
     return call("profiles.list_profiles")
 
 
 @covers("GET /api/profiles")
-def list_profiles(kind: str | None = None) -> list:
+def list_profiles(kind: str | None = None) -> list[Any]:
     """Every profile in the data folder (optionally only "local" or "cloud")."""
     return [Profile(p) for p in _profile_rows() if kind in (None, p["kind"])]
 
@@ -159,7 +164,7 @@ def profile(name_or_id: Union[str, Profile]) -> Profile:
     return Profile(hit[0])
 
 
-def _upsert_profile(body: dict) -> Profile:
+def _upsert_profile(body: dict[str, Any]) -> Profile:
     """Create the profile, or update the one with the same name: calling cloud_model() or local_model() twice
     with the same arguments gives the same profile instead of piling up copies."""
     same = [p for p in _profile_rows() if p["name"].lower() == body["name"].lower()]
@@ -183,7 +188,7 @@ def _upsert_profile(body: dict) -> Profile:
 @covers("POST /api/profiles")
 def cloud_model(vendor: str, model: str, *, api_key: str | None = None, name: str | None = None,
                 base_url: str | None = None, api_style: str | None = None, budget_usd: float | None = None,
-                pricing: Union[str, dict, None] = "auto", **params) -> Profile:
+                pricing: Union[str, dict[str, Any], None] = "auto", **params: Any) -> Profile:
     """A cloud model to benchmark, e.g. cloud_model("anthropic", "claude-sonnet-5-5", reasoning_effort="low").
 
     vendor: openai, anthropic, google, deepseek, moonshot, zai, qwen, minimax, xai, mistral, openrouter, groq, together,
@@ -229,13 +234,13 @@ def cloud_model(vendor: str, model: str, *, api_key: str | None = None, name: st
     effort = params.get("reasoning_effort")
     default_name = f"{model} · {v['name'].split(' (')[0]}" + (f" · {effort}" if effort else "")
     return _upsert_profile({"kind": "cloud", "name": name or default_name, "provider_id": prov["id"],
-                            "remote_model": model, "params": _params("cloud", params), "pricing": pricing or {}})
+                            "remote_model": model, "params": profile_params("cloud", params), "pricing": pricing or {}})
 
 
 # ------------------------------------------------------------------ local
 @covers("POST /api/profiles")
 def local_model(repo: str | None = None, *, quant: str | None = None, path: Union[str, Path, None] = None,
-                name: str | None = None, download: bool = True, quiet: bool = False, **params) -> Profile:
+                name: str | None = None, download: bool = True, quiet: bool = False, **params: Any) -> Profile:
     """A GGUF model run by llama.cpp on this machine.
 
     From Hugging Face: local_model("unsloth/Qwen3.8-27B-GGUF", quant="UD-Q3_K_XL", ctx=49152) downloads the file
@@ -249,25 +254,25 @@ def local_model(repo: str | None = None, *, quant: str | None = None, path: Unio
         m = _model_from_path(Path(path).expanduser(), quant)
     else:
         m = _model_from_repo(repo, quant, download, quiet)
-    return _local_profile(call("models.model_detail", mid=m["id"]), name, params, quiet)
+    return local_profile(call("models.model_detail", mid=m["id"]), name, params, quiet)
 
 
-def _local_profile(m: dict, name, params, quiet) -> Profile:
-    given = _params("local", params)
+def local_profile(m: dict[str, Any], name: Any, params: Any, quiet: Any) -> Profile:
+    given = profile_params("local", params)
     ctx = given.get("ctx")
     default_name = m["name"] + (f" · {ctx // 1024}k" if ctx else "")
     prof = _upsert_profile({"kind": "local", "name": name or default_name, "model_id": m["id"], "params": given})
     try:
         verdict = prof.check()
         if verdict.get("verdict") in ("oom", "spill"):
-            _say(quiet, f"warning: {prof.name} is projected not to fit ({verdict['verdict']}); "
+            say(quiet, f"warning: {prof.name} is projected not to fit ({verdict['verdict']}); "
                         "check() shows the details and fixes")
     except LLMDynoError:
         pass
     return prof
 
 
-def _model_from_path(p: Path, quant):
+def _model_from_path(p: Path, quant: Any):
     if not p.exists():
         raise NotFoundError(f"{p} does not exist")
     folder = p.parent if p.is_file() else p
@@ -284,10 +289,10 @@ def _model_from_path(p: Path, quant):
     return here[0]
 
 
-def _model_from_repo(repo, quant, download, quiet):
+def _model_from_repo(repo: Any, quant: Any, download: Any, quiet: Any):
     from .models import Model, download_model
 
-    def match(m):
+    def match(m: Any):
         return not quant or (m["quant"] or "").lower() == quant.lower() or quant.lower() in (m["name"] or "").lower()
     mine = [m for m in call("models.list_models") if m["repo"] == repo and match(m)]
     ready = [m for m in mine if m["status"] == "ready"]
@@ -296,14 +301,14 @@ def _model_from_repo(repo, quant, download, quiet):
     if not download:
         raise NotFoundError(f"{repo} {quant or ''} is not downloaded (pass download=True)".replace("  ", " "))
     if mine:                                              # an interrupted download: carry on
-        _say(quiet, f"Resuming download of {repo} {mine[0]['quant']}")
+        say(quiet, f"Resuming download of {repo} {mine[0]['quant']}")
         return Model(mine[0]).resume(quiet=quiet).to_dict()
     return download_model(repo, quant, quiet=quiet).to_dict()
 
 
 # ------------------------------------------------------------------ sharing and defaults
 @covers("POST /api/profiles/import")
-def import_profile(source: Union[str, Path, dict]) -> Profile:
+def import_profile(source: Union[str, Path, dict[str, Any]]) -> Profile:
     """Create a profile from an exported profile file (a path or the dict Profile.export() returned). Its model
     must already be downloaded here, or a provider of its vendor added, first."""
     body = source if isinstance(source, dict) else json.loads(Path(source).expanduser().read_text(encoding="utf-8"))
@@ -311,7 +316,7 @@ def import_profile(source: Union[str, Path, dict]) -> Profile:
 
 
 @covers("GET /api/profiles/defaults")
-def profile_defaults(kind: str = "local", model=None) -> dict:
+def profile_defaults(kind: str = "local", model: Any=None) -> dict[str, Any]:
     """The settings a new profile starts from: for "local", tuned to a model (Model, id or name) and this machine;
     for "cloud", the cloud defaults."""
     mid = None

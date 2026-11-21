@@ -1,11 +1,12 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Plans: profiles × harnesses × benchmarks × iterations, checked first, then run in the background."""
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence, Union
+from typing import Any, Sequence, TYPE_CHECKING, Union
 
 from ..errors import LLMDynoError, PreflightError
-from ._core import Handle, Job, _as_list, _say, call, covers
+from ._core import Handle, Job, as_list, say, call, covers
 from .profiles import Profile, profile
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -13,18 +14,18 @@ if TYPE_CHECKING:  # pragma: no cover
 
 __all__ = ["Plan", "bench", "preflight", "list_plans", "plan"]
 
-def _plan_body(models, benchmarks, harnesses, iterations, name, options):
-    ids = [profile(m).id for m in _as_list(models)]
+def _plan_body(models: Any, benchmarks: Any, harnesses: Any, iterations: Any, name: Any, options: Any):
+    ids = [profile(m).id for m in as_list(models)]
     if not ids:
         raise LLMDynoError("pass at least one model (a Profile, or a profile name or id)")
-    return {"name": name or "", "profile_ids": ids, "harness_ids": _as_list(harnesses),
-            "benchmark_ids": _as_list(benchmarks), "iterations": iterations,
+    return {"name": name or "", "profile_ids": ids, "harness_ids": as_list(harnesses),
+            "benchmark_ids": as_list(benchmarks), "iterations": iterations,
             "options": {k: v for k, v in options.items() if v is not None}}
 
 
 @covers("POST /api/plans/preflight")
-def preflight(models, benchmarks: Union[str, Sequence[str]] = "suite_quick",
-              harnesses: Union[str, Sequence[str]] = "pi", *, iterations: int = 1, **options) -> dict:
+def preflight(models: Any, benchmarks: Union[str, Sequence[str]] = "suite_quick",
+              harnesses: Union[str, Sequence[str]] = "pi", *, iterations: int = 1, **options: Any) -> dict[str, Any]:
     """What bench() would check before starting: blocking problems, warnings, and time and cost estimates."""
     return call("plans.plan_preflight", body=_plan_body(models, benchmarks, harnesses, iterations, None, options))
 
@@ -35,7 +36,7 @@ def bench(models: Union[Profile, str, Sequence[Union[Profile, str]]],
           iterations: int = 1, name: str | None = None, budget_usd: float | None = None, quality: bool = True,
           timeout_multiplier: float | None = None, cloud_concurrency: int | None = None, allow_spill: bool = False,
           acknowledge_risks: bool = False, wait: bool = True, quiet: bool = False,
-          on_event=None, auto_log=None) -> Union["Results", "Plan"]:
+          on_event: Any=None, auto_log: Any=None) -> Union["Results", "Plan"]:
     """Run models × harnesses × benchmarks × iterations and return the scored Results.
 
     models: Profiles (from cloud_model / local_model) or profile names. benchmarks: benchmark or suite ids
@@ -56,9 +57,9 @@ def bench(models: Union[Profile, str, Sequence[Union[Profile, str]]],
         raise PreflightError(risky + ["pass acknowledge_risks=True to run anyway (results will be flagged)"],
                              [w["text"] for w in pf["warnings"]], pf)
     for w in pf["warnings"]:
-        _say(quiet, f"  {w['level']}: {w['text']}")
+        say(quiet, f"  {w['level']}: {w['text']}")
     est = pf["estimate"]
-    _say(quiet, f"Plan: {pf['n_runs']} run(s), about {est['minutes']:.0f} min"
+    say(quiet, f"Plan: {pf['n_runs']} run(s), about {est['minutes']:.0f} min"
                 + (f", about ${est['cost_usd']:.2f} in API costs" if est.get("cost_usd") else ""))
     created = call("plans.create_plan", body={**body, "start": True, "acknowledge_risks": acknowledge_risks})
     p = Plan(created["plan_id"], created.get("job_id"))
@@ -81,8 +82,8 @@ class Plan(Handle):
         super().__init__(plan_id)
         self._job = job_id
 
-    def _get(self) -> dict:
-        return self.refresh()._d
+    def _get(self) -> dict[str, Any]:
+        return self._fresh()
 
     @covers("GET /api/plans/{pid}")
     def refresh(self) -> "Plan":
@@ -103,22 +104,22 @@ class Plan(Handle):
         jid = self._job or (self._get().get("job") or {}).get("id")
         return Job(jid) if jid else None
 
-    def runs(self) -> list:
+    def runs(self) -> list[Any]:
         """Every run with its status, scores and timing (dicts; run(id) or get_runs() give Run objects)."""
         return self._get().get("runs") or []
 
-    def get_runs(self) -> list:
+    def get_runs(self) -> list[Any]:
         """Every run as a Run object (transcript, files, logs, retry, …)."""
         from .runs import Run
         return [Run(r["id"]) for r in self.runs()]
 
     @covers("POST /api/plans/{pid}/retry")
-    def retry(self, statuses=("failed", "cancelled"), wait: bool = True, quiet: bool = False, on_event=None):
+    def retry(self, statuses: Any=("failed", "cancelled"), wait: bool = True, quiet: bool = False, on_event: Any=None):
         """Run the failed and cancelled runs again (or those with the given statuses) and, with wait=True, wait for
         the plan and return its Results; otherwise return how many runs were queued."""
         r = call("plans.retry_plan", pid=self.id, body={"statuses": list(statuses)})
         self._job = r.get("job_id")
-        _say(quiet, f"Retrying {r['requeued']} run(s)")
+        say(quiet, f"Retrying {r['requeued']} run(s)")
         return self.wait(quiet=quiet, on_event=on_event) if wait else r["requeued"]
 
     @covers("PATCH /api/plans/{pid}")
@@ -135,7 +136,7 @@ class Plan(Handle):
         d = self._get()
         return f"<llmdyno.Plan {d['name']!r} {d['status']} {d.get('counts')}>"
 
-    def wait(self, quiet: bool = False, on_event=None, transcript: bool = False, progress: bool | None = None) -> "Results":
+    def wait(self, quiet: bool = False, on_event: Any=None, transcript: bool = False, progress: bool | None = None) -> "Results":
         """Block until the plan stops, printing each run as it finishes, then return its Results. on_event(ev) is
         called for every live Event (see watch(); transcript=True adds agent events). progress shows a tqdm bar
         (default: when tqdm is installed and the output is a terminal or notebook). Ctrl+C cancels the plan."""
@@ -143,31 +144,32 @@ class Plan(Handle):
         labels = _labels()
         printed: dict[str, str] = {}
         bar = _progress(self, quiet, progress)
-        say = (lambda q, msg: bar.write(msg)) if bar is not None else _say
+        emit = (lambda q, msg: bar.write(msg)) if bar is not None else say
         try:
             for ev in watch(self, transcript=transcript, gpu=on_event is not None):
                 if on_event is not None:
                     on_event(ev)
-                if ev.kind == "run" and ev.status in RUN_FINISHED and printed.get(ev.run_id) != ev.status:
-                    printed[ev.run_id] = ev.status          # a finished run can be updated again (quality scores)
-                    say(quiet, "  " + _run_line(ev.data, labels))
+                rid = ev.run_id or ""
+                if ev.kind == "run" and ev.status in RUN_FINISHED and printed.get(rid) != ev.status:
+                    printed[rid] = ev.status or ""          # a finished run can be updated again (quality scores)
+                    emit(quiet, "  " + _run_line(ev.data, labels))
                     if bar is not None:
                         bar.update(1)
         except KeyboardInterrupt:
-            _say(quiet, "  cancelling the plan (finished runs are kept) …")
+            say(quiet, "  cancelling the plan (finished runs are kept) …")
             call("plans.cancel_plan", pid=self.id)
             job = (self._get().get("job") or {}).get("id")
             if job:
-                Job(job)._drain()
+                Job(job).drain()
             raise
         finally:
             if bar is not None:
                 bar.close()
         d = self._get()
-        _say(quiet, f"Plan {d['status']}: {d.get('counts')}")
+        say(quiet, f"Plan {d['status']}: {d.get('counts')}")
         return self.results()
 
-    def results(self, **weights) -> "Results":
+    def results(self, **weights: Any) -> "Results":
         from .results import results
         return results(self, **weights)
 
@@ -180,7 +182,7 @@ class Plan(Handle):
         call("plans.pause_plan", pid=self.id)
 
     @covers("POST /api/plans/{pid}/resume")
-    def resume(self, wait: bool = True, quiet: bool = False, on_event=None):
+    def resume(self, wait: bool = True, quiet: bool = False, on_event: Any=None):
         call("plans.resume_plan", pid=self.id)
         return self.wait(quiet=quiet, on_event=on_event) if wait else self
 
@@ -194,8 +196,8 @@ class Plan(Handle):
 
     def open(self) -> str:
         """Open this plan in the dashboard (starts the web app in the background if it is not running)."""
-        from .ui import _open_ui
-        return _open_ui(f"/plans/{self.id}")
+        from .ui import open_ui
+        return open_ui(f"/plans/{self.id}")
 
     def live(self):
         """A Jupyter widget that follows the plan as it runs (progress, finished runs, GPU); needs
@@ -209,7 +211,7 @@ class Plan(Handle):
 
 
 @covers("GET /api/plans")
-def list_plans() -> list:
+def list_plans() -> list[Any]:
     """Every plan in the data folder, newest first."""
     return [Plan(p["id"]) for p in call("plans.list_plans")]
 
@@ -219,7 +221,7 @@ def plan(plan_id: str) -> Plan:
     return Plan(plan_id).refresh()
 
 
-def _progress(plan, quiet, progress):
+def _progress(plan: Any, quiet: Any, progress: Any):
     """A tqdm bar over the plan's runs when wanted and available."""
     import sys
     if quiet or progress is False:
@@ -236,14 +238,14 @@ def _progress(plan, quiet, progress):
     return bar
 
 
-def _labels() -> dict:
+def _labels() -> dict[str, Any]:
     """Display names for profiles, harnesses and benchmarks."""
     return {"profiles": {p["id"]: {"name": p["name"]} for p in call("profiles.list_profiles")},
             "harnesses": {h["id"]: h["name"] for h in call("harnesses.list_harnesses")},
             "benchmarks": {b["id"]: {"title": b.get("title", b["id"])} for b in call("benchmarks.list_benchmarks")}}
 
 
-def _run_line(r, labels):
+def _run_line(r: Any, labels: Any):
     prof = (labels["profiles"].get(r["profile_id"]) or {}).get("name", r["profile_id"])
     bench_title = (labels["benchmarks"].get(r["benchmark_id"]) or {}).get("title", r["benchmark_id"])
     h = labels["harnesses"].get(r["harness_id"], r["harness_id"])

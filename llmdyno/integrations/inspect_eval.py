@@ -84,11 +84,11 @@ def inspect_task(benchmarks, profile, harness: str = "pi", name: str = "llmdyno"
     from inspect_ai.dataset import Sample
 
     from .. import lib
-    from ..sdk._core import _as_list, _id
+    from ..sdk._core import as_list, id_of
     suites = {s["id"]: s["benchmark_ids"] for s in lib.list_suites()}
     ids = []
-    for b in _as_list(benchmarks):
-        ids += suites.get(_id(b), [_id(b)])
+    for b in as_list(benchmarks):
+        ids += suites.get(id_of(b), [id_of(b)])
     samples = []
     for bid in dict.fromkeys(ids):
         b = lib.benchmark(bid)
@@ -96,9 +96,9 @@ def inspect_task(benchmarks, profile, harness: str = "pi", name: str = "llmdyno"
                               metadata={"benchmark_id": bid, "title": b.title, "stages": len(b.prompts)}))
     comps = _registered()
     prof = lib.profile(profile)
-    return Task(dataset=samples, solver=comps["agent"](prof.id, str(_id(harness)), bench_options),
+    return Task(dataset=samples, solver=comps["agent"](prof.id, str(id_of(harness)), bench_options),
                 scorer=comps["scorer"](), name=name,
-                metadata={"llmdyno_version": __version__, "profile": prof.name, "harness": _id(harness)})
+                metadata={"llmdyno_version": __version__, "profile": prof.name, "harness": id_of(harness)})
 
 
 def _text(x) -> str:

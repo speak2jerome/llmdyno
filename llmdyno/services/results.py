@@ -110,7 +110,7 @@ def export(plan_ids: str = '', level: str = 'runs', fmt: str = 'csv', weights: s
             d["benchmark"] = (bl.get(r["benchmark_id"]) or {}).get("title", r["benchmark_id"])
         for k, v in r.items():
             if isinstance(v, (dict, list)):
-                if k == "points":
+                if k == "points" and isinstance(v, dict):
                     for pk, pv in v.items():
                         d[f"points_{pk}"] = pv
                 continue

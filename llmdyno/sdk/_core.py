@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Pieces every SDK area uses: the data folder, the base Handle class, background jobs, printing and the route map.
 
 Conventions for SDK modules (one per area, mirroring llmdyno/services):
@@ -13,7 +14,7 @@ import copy
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Self, TypeVar
 
 from ..errors import LLMDynoError
 from ._backend import LocalBackend, backend, call
@@ -22,13 +23,14 @@ TERMINAL = ("done", "failed", "cancelled", "paused")
 
 # ------------------------------------------------------------------ route coverage
 ROUTES: dict[str, list[str]] = {}
+F = TypeVar("F")
 
 
-def covers(*routes: str):
+def covers(*routes: str) -> Callable[[F], F]:
     """Declare that the decorated SDK function, method or property gives access to these web API routes,
     written as "GET /api/runs/{rid}" (the path exactly as the server declares it)."""
-    def deco(fn):
-        target = fn.fget if isinstance(fn, property) else fn
+    def deco(fn: F) -> F:
+        target: Any = fn.fget if isinstance(fn, property) else fn
         name = f"{target.__module__}.{target.__qualname__}"
         for r in routes:
             method, _, path = r.partition(" ")
@@ -40,7 +42,7 @@ def covers(*routes: str):
 
 
 # ------------------------------------------------------------------ data folder
-def init(data_dir=None) -> Path:
+def init(data_dir: str | Path | None = None) -> Path:
     """Open (and create if needed) a data folder. Optional: without it LLMDyno uses LLMDYNO_DATA or the default
     folder (./data in a git checkout, otherwise %LOCALAPPDATA%\\LLMDyno, ~/Library/Application Support/LLMDyno or
     ~/.local/share/llmdyno). Call it again with another folder to switch."""
@@ -60,7 +62,7 @@ def data_dir() -> Path:
 
 
 # ------------------------------------------------------------------ small helpers
-def _say(quiet: bool, msg: str) -> None:
+def say(quiet: bool, msg: str) -> None:
     if not quiet:
         try:
             print(msg, flush=True)
@@ -69,7 +71,7 @@ def _say(quiet: bool, msg: str) -> None:
             print(msg.encode(enc, "replace").decode(enc), flush=True)
 
 
-def _as_list(x) -> list:
+def as_list(x: Any) -> list[Any]:
     if x is None:
         return []
     if isinstance(x, (str, Handle)):
@@ -77,7 +79,7 @@ def _as_list(x) -> list:
     return list(x)
 
 
-def _id(x) -> str:
+def id_of(x: Any) -> str:
     return x.id if isinstance(x, Handle) else str(x)
 
 
@@ -90,8 +92,9 @@ class Handle:
 
     _get_op = ""             # the service that returns this object's data
     _id_arg = "id"           # that service's id parameter
+    _d: dict[str, Any] | None
 
-    def __init__(self, data: dict | str):
+    def __init__(self, data: dict[str, Any] | str):
         if isinstance(data, str):
             self._id, self._d = data, None
         else:
@@ -103,17 +106,24 @@ class Handle:
         return self._id
 
     @property
-    def _data(self) -> dict:
+    def _data(self) -> dict[str, Any]:
         if self._d is None:
             self.refresh()
+        assert self._d is not None
         return self._d
 
-    def refresh(self):
+    def _fresh(self) -> dict[str, Any]:
+        """The data, fetched again."""
+        self.refresh()
+        assert self._d is not None
+        return self._d
+
+    def refresh(self) -> Self:
         """Fetch the latest data; returns self."""
         self._d = call(self._get_op, **{self._id_arg: self._id})
         return self
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Everything LLMDyno knows about this object, as a plain dict (a copy)."""
         return copy.deepcopy(self._data)
 
@@ -123,13 +133,13 @@ class Handle:
     def get(self, key: str, default: Any = None) -> Any:
         return self._data.get(key, default)
 
-    def __eq__(self, other):
-        return type(other) is type(self) and other.id == self.id
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Handle) and type(other) is type(self) and other.id == self.id
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((type(self).__name__, self.id))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<llmdyno.{type(self).__name__} {self.id}>"
 
 
@@ -143,7 +153,7 @@ class Job(Handle):
     @property
     def status(self) -> str:
         """queued, running, done, failed, cancelled or paused (fetched fresh)."""
-        return self.refresh()._d["status"]
+        return self._fresh()["status"]
 
     @property
     def title(self) -> str:
@@ -152,49 +162,49 @@ class Job(Handle):
     @property
     def progress(self) -> float | None:
         """0-1 when the job reports it (fetched fresh)."""
-        return self.refresh()._d.get("progress")
+        return self._fresh().get("progress")
 
     @property
-    def result(self) -> dict:
-        return self.refresh()._d.get("result") or {}
+    def result(self) -> dict[str, Any]:
+        return self._fresh().get("result") or {}
 
     @property
     def log(self) -> str:
         """The tail of the job's log (fetched fresh)."""
-        return self.refresh()._d.get("log") or ""
+        return self._fresh().get("log") or ""
 
     @covers("POST /api/jobs/{jid}/cancel")
     def cancel(self) -> None:
         """Stop the job (a download keeps what it has, a plan keeps finished runs)."""
         call("system.cancel_job", jid=self.id)
 
-    def wait(self, quiet: bool = False, verbose: bool = False, every_s: float = 2.0) -> dict:
+    def wait(self, quiet: bool = False, verbose: bool = False, every_s: float = 2.0) -> dict[str, Any]:
         """Block until the job ends, printing its progress, and return its result. Ctrl+C cancels the job;
         a failed or cancelled job raises LLMDynoError."""
         seen, last_detail, last_print = 0, None, 0.0
-        j = self.refresh()._d
+        j = self._fresh()
         try:
             while True:
-                j = self.refresh()._d
+                j = self._fresh()
                 log = j.get("log") or ""
                 if verbose and not quiet:
                     if len(log) < seen:
                         seen = 0                                   # the stored log keeps a tail only
                     for line in log[seen:].splitlines():
-                        _say(False, "    " + line)
+                        say(False, "    " + line)
                     seen = len(log)
                 detail = j.get("detail") or ""
                 if not quiet and detail and detail != last_detail and time.time() - last_print >= every_s:
                     pct = f"{int((j.get('progress') or 0) * 100):>3}% " if j.get("progress") else ""
-                    _say(False, f"  {pct}{j['title']}: {detail}")
+                    say(False, f"  {pct}{j['title']}: {detail}")
                     last_detail, last_print = detail, time.time()
                 if j["status"] in TERMINAL:
                     break
                 time.sleep(0.5)
         except KeyboardInterrupt:
-            _say(quiet, f"  cancelling {j.get('title') or self.id} …")
+            say(quiet, f"  cancelling {j.get('title') or self.id} …")
             self.cancel()
-            self._drain()
+            self.drain()
             raise
         if j["status"] == "failed":
             tail = "\n".join(ln for ln in (j.get("log") or "").splitlines()[-12:] if ln.strip())
@@ -203,15 +213,15 @@ class Job(Handle):
             raise LLMDynoError(f"{j['title']} was {j['status']}")
         return j.get("result") or {}
 
-    def _drain(self, timeout_s: float = 120) -> None:
+    def drain(self, timeout_s: float = 120) -> None:
         """Wait (quietly) for a cancelled job to actually stop."""
         end = time.time() + timeout_s
         while time.time() < end:
-            if self.refresh()._d["status"] in TERMINAL:
+            if self._fresh()["status"] in TERMINAL:
                 return
             time.sleep(0.5)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         d = self._d or {}
         return f"<llmdyno.Job {self.id} {d.get('title', '')!r} {d.get('status', '')}>".replace("  ", " ")
 
@@ -222,7 +232,3 @@ def job(job_id: str) -> Job:
     return Job(job_id).refresh()
 
 
-def _run_job(op: str, quiet: bool = False, verbose: bool = False, **kwargs) -> dict:
-    """Start a job-returning service and wait for it."""
-    r = call(op, **kwargs)
-    return Job(r["job_id"]).wait(quiet=quiet, verbose=verbose)

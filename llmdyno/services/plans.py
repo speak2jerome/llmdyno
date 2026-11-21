@@ -113,6 +113,7 @@ def retry_plan(pid: str, body: dict | None = None):
             n += 1
         if n:
             pl = s.get(db.Plan, pid)
+            assert pl is not None              # checked by _get() above
             pl.started_at, pl.ended_at = None, None     # a retry is a new execution: elapsed time restarts
         s.commit()
     if not n:

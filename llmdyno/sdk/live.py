@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Live progress: watch() a plan, run or job as it works, the same events the dashboard shows."""
 from __future__ import annotations
 
@@ -55,7 +56,7 @@ class Event:
         return self.kind in ("plan", "job") and self.status in TERMINAL
 
 
-def _target(x) -> tuple[str, str]:
+def _target(x: Any) -> tuple[str, str]:
     """(kind, id) for a Plan / Job / other handle or an id string."""
     from .plans import Plan
     from ._core import Job
@@ -71,7 +72,7 @@ def _target(x) -> tuple[str, str]:
 
 
 @covers("WS /ws")
-def watch(target, *, transcript: bool = False, gpu: bool = True, timeout: float | None = None,
+def watch(target: Any, *, transcript: bool = False, gpu: bool = True, timeout: float | None = None,
           poll_s: float = 2.0, _stop: threading.Event | None = None) -> Iterator[Event]:
     """Iterate over what happens to a plan, run or job until it stops:
 
@@ -85,7 +86,7 @@ def watch(target, *, transcript: bool = False, gpu: bool = True, timeout: float 
     seconds (run and plan changes only). transcript=True adds every agent event and model request; gpu=False drops
     the GPU samples. timeout (seconds) stops waiting early."""
     kind, tid = _target(target)
-    q: queue.Queue = queue.Queue()
+    q: queue.Queue[Event] = queue.Queue()
     runs: set[str] = set()
     last: dict[str, str] = {}                   # id -> last status reported (live or polled)
     polled: set[str] = set()                    # ids whose last status came from a poll, not a live event
@@ -105,7 +106,7 @@ def watch(target, *, transcript: bool = False, gpu: bool = True, timeout: float 
             return topic == f"plan:{tid}" or (transcript and topic.startswith("run:") and topic[4:] in runs)
         return topic == f"{kind}:{tid}"
 
-    def on_msg(msg):
+    def on_msg(msg: Any):
         area = msg["topic"].split(":", 1)[0]
         ev_kind = _KINDS.get((area, msg["kind"]))
         if ev_kind is None or (ev_kind == "gpu" and not gpu):
@@ -178,7 +179,7 @@ def watch(target, *, transcript: bool = False, gpu: bool = True, timeout: float 
             sub.close()
 
 
-def _stopped(kind: str, d: dict) -> bool:
+def _stopped(kind: str, d: dict[str, Any]) -> bool:
     if kind == "plan":
         job = d.get("job") or {}
         return d["status"] in TERMINAL and job.get("status") in (*TERMINAL, None)

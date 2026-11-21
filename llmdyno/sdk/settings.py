@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Settings and tokens (Hugging Face)."""
 from __future__ import annotations
 
@@ -23,7 +24,7 @@ class Settings:
     cloud_concurrency, weights, quality_weights, llama_port. The rest (data_dir, port, llama_cpp, hf_token_set, …)
     are read-only here."""
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict[str, Any]):
         self._d = dict(data)
 
     def __getattr__(self, name: str) -> Any:
@@ -43,7 +44,7 @@ class Settings:
     def __dir__(self):
         return sorted(set(super().__dir__()) | set(self._d))
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return copy.deepcopy(self._d)
 
     def refresh(self) -> "Settings":
@@ -51,7 +52,7 @@ class Settings:
         return self
 
     @covers("PATCH /api/settings")
-    def update(self, **changes) -> "Settings":
+    def update(self, **changes: Any) -> "Settings":
         """Change and save settings, e.g. update(cloud_concurrency=4). Weights merge into the current ones."""
         unknown = set(changes) - set(EDITABLE)
         if unknown:

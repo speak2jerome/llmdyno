@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Scored results: the leaderboard, per-run rows, public-benchmark rates and exports."""
 from __future__ import annotations
 
@@ -5,23 +6,23 @@ import csv
 import io
 import json
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Any, Sequence, Union
 
-from ._core import _as_list, _id, call, covers
+from ._core import as_list, id_of, call, covers
 
 __all__ = ["Results", "results", "save_weights", "sample_status", "load_sample", "unload_sample",
            "load_results_from_hub"]
 
 @covers("GET /api/results")
-def results(plans=None, *, include_sample: bool = False, correctness: float | None = None,
+def results(plans: Any=None, *, include_sample: bool = False, correctness: float | None = None,
             instruction_following: float | None = None, quality: float | None = None,
-            efficiency: float | None = None, quality_weights: dict | None = None, benchmarks=None,
+            efficiency: float | None = None, quality_weights: dict[str, Any] | None = None, benchmarks: Any=None,
             pass_threshold: float = 0.8, efficiency_ref: str = "local") -> "Results":
     """Scored results for some plans (default: every plan except the bundled sample), with every option of the
     Results page: the four weights reshape the final score (defaults 50/15/25/10); quality_weights splits code
     quality between "static", "probes" and "review"; benchmarks limits it to some benchmarks; pass_threshold is the
     correctness that counts as a pass (pass@k); efficiency_ref compares speed and cost among "local" or "all" runs."""
-    ids = [_id(p) for p in _as_list(plans)]
+    ids = [id_of(p) for p in as_list(plans)]
     saved = call("settings.get_settings")
     w = dict(saved["weights"])
     for k, v in (("correctness", correctness), ("instruction_following", instruction_following),
@@ -30,7 +31,7 @@ def results(plans=None, *, include_sample: bool = False, correctness: float | No
             w[k] = v
     qw = {**saved["quality_weights"], **(quality_weights or {})}
     options = {"plan_ids": ",".join(ids), "weights": json.dumps(w), "quality_weights": json.dumps(qw),
-               "benchmark_ids": ",".join(_id(b) for b in _as_list(benchmarks))}
+               "benchmark_ids": ",".join(id_of(b) for b in as_list(benchmarks))}
     data = call("results.results", pass_threshold=pass_threshold, efficiency_ref=efficiency_ref,
                 include_sample=include_sample or bool(ids), **options)
     return Results(data, ids, options)
@@ -40,32 +41,32 @@ class Results:
     """Scored results. print(results) shows the leaderboard; leaderboard() and runs() return rows; to_pandas(),
     to_csv() and to_json() export them; open() shows the dashboard."""
 
-    def __init__(self, data: dict, plan_ids: Sequence[str] = (), options: dict | None = None):
+    def __init__(self, data: dict[str, Any], plan_ids: Sequence[str] = (), options: dict[str, Any] | None = None):
         self.data, self.plan_ids = data, list(plan_ids)
         self._labels = data.get("labels") or {}
         self._options = dict(options or {"plan_ids": ",".join(self.plan_ids)})
 
     # -- the Results page's other views
-    def cells(self) -> list:
+    def cells(self) -> list[Any]:
         """One row per profile × harness × benchmark: pass rate, scores with standard deviation and 95% interval over
         iterations, time, tokens and cost (the heatmap)."""
         return [{"profile": self._name(c), "harness": self._harness(c), **c} for c in self.data.get("cells") or []]
 
-    def reviews(self) -> list:
+    def reviews(self) -> list[Any]:
         """Every LLM-judge review behind these results (scores per rubric dimension, summary, issues)."""
         return list(self.data.get("reviews") or [])
 
-    def rubric(self) -> list:
+    def rubric(self) -> list[Any]:
         """Average judge score per rubric dimension for each profile × harness (the rubric chart)."""
         return [{"profile": self._name(r), "harness": self._harness(r), **r} for r in self.data.get("rubric") or []]
 
-    def agreement(self) -> dict:
+    def agreement(self) -> dict[str, Any]:
         """How much the judges agree with each other (correlation per judge pair) and how much each favours its own
         model family: {"judges", "pairs", …}."""
         return dict(self.data.get("agreement") or {})
 
     @covers("GET /api/references/aa")
-    def reference(self) -> list:
+    def reference(self) -> list[Any]:
         """Each profile's Artificial Analysis coding index next to its score here (needs set_aa_key())."""
         ref = call("references.aa_reference")
         out = []
@@ -87,14 +88,14 @@ class Results:
             Path(path).write_text(d["content"], encoding="utf-8")
         return d["content"]
 
-    def _name(self, r):
+    def _name(self, r: Any) -> str:
         p = (self._labels.get("profiles") or {}).get(r["profile_id"]) or {}
         return p.get("name") or r["profile_id"]
 
-    def _harness(self, r):
+    def _harness(self, r: Any) -> str:
         return (self._labels.get("harnesses") or {}).get(r["harness_id"], r["harness_id"])
 
-    def leaderboard(self) -> list:
+    def leaderboard(self) -> list[Any]:
         """One row per profile × harness, best first. Scores are 0-100."""
         rows = []
         for i, c in enumerate(self.data.get("configs") or [], 1):
@@ -109,7 +110,7 @@ class Results:
                          "profile_id": c["profile_id"], "harness_id": c["harness_id"]})
         return rows
 
-    def runs(self) -> list:
+    def runs(self) -> list[Any]:
         """One row per run (benchmark × iteration)."""
         bl = self._labels.get("benchmarks") or {}
         out = []
@@ -126,7 +127,7 @@ class Results:
                         "spill": r.get("spill_detected")})
         return out
 
-    def public(self) -> list:
+    def public(self) -> list[Any]:
         """SWE-bench resolved rate and Aider polyglot solved rate per profile × harness (only when such runs exist)."""
         groups = {}
         for r in self.data.get("runs") or []:
@@ -142,14 +143,14 @@ class Results:
                         "polyglot_solved_pct": rate(g["polyglot"]), "polyglot_runs": len(g["polyglot"])})
         return out
 
-    def best(self) -> dict | None:
+    def best(self) -> dict[str, Any] | None:
         lb = self.leaderboard()
         return lb[0] if lb else None
 
     # -- export
     LEVELS = ("configs", "runs", "cells", "reviews", "rubric", "public")
 
-    def rows(self, level: str = "configs") -> list:
+    def rows(self, level: str = "configs") -> list[Any]:
         """The rows of one table: configs (the leaderboard), runs, cells, reviews, rubric or public."""
         views = {"configs": self.leaderboard, "runs": self.runs, "cells": self.cells, "reviews": self.reviews,
                  "rubric": self.rubric, "public": self.public}
@@ -157,12 +158,12 @@ class Results:
             raise ValueError(f"level is one of {', '.join(views)}, not {level!r}")
         return views[level]()
 
-    def to_pandas(self, level: str = "configs"):
+    def to_pandas(self, level: str = "configs") -> Any:
         """A pandas DataFrame of one table (see rows()): the leaderboard by default."""
         from ..integrations.data import frame
         return frame(self.rows(level), "pandas")
 
-    def to_polars(self, level: str = "configs"):
+    def to_polars(self, level: str = "configs") -> Any:
         """A polars DataFrame of one table (see rows()); needs "llmdyno[data]"."""
         from ..integrations.data import frame
         return frame(self.rows(level), "polars")
@@ -174,7 +175,7 @@ class Results:
 
     # -- tracking and tracing
     def log_to_mlflow(self, experiment: str = "llmdyno", tracking_uri: str | None = None,
-                      transcripts: bool = True) -> list:
+                      transcripts: bool = True) -> list[Any]:
         """One MLflow run per configuration: settings as params, scores as metrics, results and transcripts as
         artifacts. Returns the MLflow run ids; needs "llmdyno[mlflow]"."""
         from ..integrations.mlflow import log_to_mlflow
@@ -188,14 +189,14 @@ class Results:
         return log_to_wandb(self, project=project, entity=entity, name=name, mode=mode, dir=dir,
                             transcripts=transcripts)
 
-    def log_to_langfuse(self, client=None, public_key: str | None = None, secret_key: str | None = None,
-                        host: str | None = None) -> list:
+    def log_to_langfuse(self, client: Any=None, public_key: str | None = None, secret_key: str | None = None,
+                        host: str | None = None) -> list[Any]:
         """Each run as a Langfuse trace with one generation per model request and the grader scores. Returns the
         trace ids; needs "llmdyno[langfuse]"."""
         from ..integrations.langfuse import log_to_langfuse
         return log_to_langfuse(self, client=client, public_key=public_key, secret_key=secret_key, host=host)
 
-    def to_otel(self, tracer_provider=None, endpoint: str | None = None, headers: dict | None = None,
+    def to_otel(self, tracer_provider: Any=None, endpoint: str | None = None, headers: dict[str, Any] | None = None,
                 service_name: str = "llmdyno") -> int:
         """Each run as an OpenTelemetry trace (GenAI semantic conventions) for any OTLP backend. Returns the number
         of spans; needs "llmdyno[otel]"."""
@@ -233,7 +234,7 @@ class Results:
             Path(path).write_text(buf.getvalue(), encoding="utf-8")
         return buf.getvalue()
 
-    def to_json(self, path: Union[str, Path, None] = None) -> dict:
+    def to_json(self, path: Union[str, Path, None] = None) -> dict[str, Any]:
         from .. import __version__ as v
         out = {"llmdyno_version": v, "plans": self.plan_ids, "leaderboard": self.leaderboard(), "runs": self.runs(),
                "public": self.public(), "weights": self.data.get("weights")}
@@ -243,9 +244,9 @@ class Results:
 
     def open(self) -> str:
         """Open these results in the dashboard (starts the web app in the background if it is not running)."""
-        from .ui import _open_ui
+        from .ui import open_ui
         q = f"?plans={','.join(self.plan_ids)}" if self.plan_ids else ""
-        return _open_ui(f"/results{q}")
+        return open_ui(f"/results{q}")
 
     # -- display
     def __str__(self):
@@ -287,7 +288,7 @@ class Results:
 @covers("POST /api/results/weights")
 def save_weights(*, correctness: float | None = None, instruction_following: float | None = None,
                  quality: float | None = None, efficiency: float | None = None,
-                 quality_weights: dict | None = None) -> dict:
+                 quality_weights: dict[str, Any] | None = None) -> dict[str, Any]:
     """Save the default score weights (what results() and the Results page start from). The four main weights are
     relative (defaults 50/15/25/10); quality_weights splits code quality between "static", "probes" and "review".
     Returns the saved {"weights", "quality_weights"}."""
@@ -304,7 +305,7 @@ def save_weights(*, correctness: float | None = None, instruction_following: flo
 
 # ------------------------------------------------------------------ the bundled sample
 @covers("GET /api/sample")
-def sample_status() -> dict:
+def sample_status() -> dict[str, Any]:
     """{"available", "loaded", "plan_id"} for the bundled sample results (15 configurations measured on an RTX 5080)."""
     return call("results.sample_status")
 

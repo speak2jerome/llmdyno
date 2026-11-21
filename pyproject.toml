@@ -81,6 +81,16 @@ packages = ["llmdyno"]
 [tool.hatch.version]
 path = "llmdyno/__init__.py"
 
+[tool.pyright]
+# The public library (llmdyno/sdk, llmdyno/errors.py) is checked in strict mode by a header comment in each file, with
+# the four "unknown type" rules relaxed: API results are JSON, dynamic by nature. Signatures there are fully typed.
+# The services, web API, CLI, integrations and remote-access code are checked in standard mode.
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+include = ["llmdyno/sdk", "llmdyno/errors.py", "llmdyno/services", "llmdyno/api", "llmdyno/integrations",
+           "llmdyno/auth.py", "llmdyno/cli.py", "llmdyno/lib.py", "llmdyno/aio.py", "llmdyno/__init__.py",
+           "llmdyno/pytest_plugin.py"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"

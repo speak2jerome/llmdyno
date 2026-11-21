@@ -180,10 +180,27 @@ results = llmdyno.bench([gpt, qwen], benchmarks="suite_quick", harnesses="pi")
 print(results)                      # leaderboard; results.to_pandas(), .to_csv(), .open() for the dashboard
 ```
 
-`llmdyno.setup()` installs what is missing (images, llama.cpp), `bench()` checks the plan before it starts and raises
-`PreflightError` with the reasons, and Ctrl+C cancels cleanly. It shares the app's data folder, so plans started from
-Python appear in the dashboard. The full guide, including SWE-bench, judges and the data folder:
-[docs/LIBRARY.md](https://github.com/speak2jerome/llmdyno/blob/main/docs/LIBRARY.md). Runnable examples are in [examples/](https://github.com/speak2jerome/llmdyno/tree/main/examples).
+`llmdyno.setup()` installs what is missing (images, llama.cpp). `bench()` checks the plan before it starts and raises
+`PreflightError` with the reasons, and Ctrl+C cancels cleanly. The library shares the app's data folder, so plans
+started from Python appear in the dashboard.
+
+The library can do everything the dashboard does, and every call is also a command
+(`llmdyno run transcript RUN_ID --view tool-calls`). It also connects to the tools you already use:
+- pandas, polars and notebooks;
+- charts like the dashboard's;
+- MLflow, Weights & Biases, Langfuse and OpenTelemetry;
+- LiteLLM and Ollama, and the Hugging Face Hub;
+- your own LangGraph, OpenAI Agents SDK, smolagents or PydanticAI agent;
+- Inspect AI, and pytest and CI regression checks.
+
+With `llmdyno.connect()`, it drives LLMDyno on another machine.
+
+Guides:
+- [the Python library and CLI](https://github.com/speak2jerome/llmdyno/blob/main/docs/LIBRARY.md)
+- [integrations](https://github.com/speak2jerome/llmdyno/blob/main/docs/INTEGRATIONS.md)
+- [remote mode](https://github.com/speak2jerome/llmdyno/blob/main/docs/REMOTE.md)
+
+Runnable examples and notebooks are in [examples/](https://github.com/speak2jerome/llmdyno/tree/main/examples).
 
 ## Round 1 results: 15 configurations on an RTX 5080
 

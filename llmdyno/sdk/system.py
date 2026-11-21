@@ -1,17 +1,18 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """System: dependency checks and setup, specs, GPU, jobs, cleanup and the panic stop."""
 from __future__ import annotations
 
-from typing import Sequence, Union
+from typing import Any, Sequence, Union
 
 from ..errors import LLMDynoError
-from ._core import Job, _say, call, covers
+from ._core import Job, say, call, covers
 
 __all__ = ["Doctor", "doctor", "setup", "specs", "gpu_usage", "active_work", "panic", "cleanup", "list_jobs",
            "clear_jobs", "start_docker", "repair_docker", "install_docker", "use_llama_cpp"]
 
 
 
-class Doctor(list):
+class Doctor(list[dict[str, Any]]):
     """The Setup page's checks as a list of dicts; prints as a table. `ok` is True when nothing required is missing."""
 
     @property
@@ -19,7 +20,7 @@ class Doctor(list):
         return all(d["ok"] for d in self if d["level"] == "required")
 
     @property
-    def missing(self) -> list:
+    def missing(self) -> list[Any]:
         return [d for d in self if not d["ok"]]
 
     def __str__(self):
@@ -52,7 +53,7 @@ def setup(harnesses: Union[str, Sequence[str]] = ("pi",), *, quality: bool = Tru
         raise LLMDynoError("Docker is not running: start Docker Desktop (or the docker service) and try again")
     todo = []
 
-    def dep(dep_id, action, **extra):
+    def dep(dep_id: Any, action: Any, **extra: Any):
         return lambda: call("system.dep_action", dep_id=dep_id, body={"action": action, **extra})
 
     if not deps["sandbox_image"]["ok"]:
@@ -82,36 +83,36 @@ def setup(harnesses: Union[str, Sequence[str]] = ("pi",), *, quality: bool = Tru
             todo.append(("Aider polyglot exercises", lambda: call("imports.import_polyglot", body={})))
         todo.append(("Polyglot toolchain image", lambda: call("imports.build_polyglot_image")))
     for label, start in todo:
-        _say(quiet, f"Setting up: {label}")
+        say(quiet, f"Setting up: {label}")
         Job(start()["job_id"]).wait(quiet=quiet, verbose=verbose)
     if not todo:
-        _say(quiet, "Everything requested is already set up.")
+        say(quiet, "Everything requested is already set up.")
     return doctor()
 
 
 # ------------------------------------------------------------------ machine
 @covers("GET /api/system/specs")
-def specs(refresh: bool = False) -> dict:
+def specs(refresh: bool = False) -> dict[str, Any]:
     """This machine: CPU and instruction sets, RAM, GPUs with VRAM and driver, disk, OS and Docker (what the
     Overview page shows). refresh=True detects again instead of using the cached result."""
     return call("system.get_specs", refresh=refresh)
 
 
 @covers("GET /api/system/gpu")
-def gpu_usage() -> list:
+def gpu_usage() -> list[Any]:
     """Live GPU readings: utilisation, VRAM used and free, temperature and power for each GPU."""
     return call("system.system_gpu")
 
 
 # ------------------------------------------------------------------ stopping things
 @covers("GET /api/system/active")
-def active_work() -> dict:
+def active_work() -> dict[str, Any]:
     """What panic() would stop right now: running jobs, plans, containers and the llama-server."""
     return call("system.system_active")
 
 
 @covers("POST /api/system/panic")
-def panic() -> dict:
+def panic() -> dict[str, Any]:
     """Stop everything at once (the red button): cancels every job and plan, kills LLMDyno's containers and the
     llama-server. Finished runs are kept. Returns what was stopped."""
     return call("system.system_panic")
@@ -125,7 +126,7 @@ def cleanup() -> int:
 
 # ------------------------------------------------------------------ background jobs
 @covers("GET /api/jobs")
-def list_jobs(active: bool = False, kind: str | None = None, limit: int = 100) -> list:
+def list_jobs(active: bool = False, kind: str | None = None, limit: int = 100) -> list[Any]:
     """Background jobs, newest first (downloads, builds, plans, reviews, imports). active=True keeps the queued and
     running ones; kind filters by type ("download", "build", "plan", "judge", "import", "install", …)."""
     return [Job(d) for d in call("system.list_jobs", active=active, limit=limit, kind=kind)]
@@ -138,7 +139,7 @@ def clear_jobs() -> int:
 
 
 # ------------------------------------------------------------------ Docker and llama.cpp
-def _dep(dep_id: str, action: str, **extra) -> dict:
+def _dep(dep_id: str, action: str, **extra: Any) -> dict[str, Any]:
     return call("system.dep_action", dep_id=dep_id, body={"action": action, **extra})
 
 
@@ -155,12 +156,12 @@ def repair_docker() -> str:
 
 
 @covers("POST /api/system/deps/{dep_id}/action")
-def install_docker(quiet: bool = False) -> dict:
+def install_docker(quiet: bool = False) -> dict[str, Any]:
     """Download and run the Docker Desktop installer (Windows and macOS; Linux uses the distribution's packages)."""
     return Job(_dep("docker", "install_docker")["job_id"]).wait(quiet=quiet)
 
 
 @covers("POST /api/system/deps/{dep_id}/action")
-def use_llama_cpp(path: str) -> dict:
+def use_llama_cpp(path: str) -> dict[str, Any]:
     """Use a llama.cpp build you already have (the folder holding llama-server) instead of installing one."""
     return _dep("llama_cpp", "use_existing_llama", path=str(path))["llama_cpp"]

@@ -82,6 +82,7 @@ def patch_profile(pid: str, body: dict):
     _validate(p["kind"], params)
     with db.Session() as s:
         obj = s.get(db.Profile, pid)
+        assert obj is not None              # checked by _get() above
         for k in ("name", "notes", "tags", "pricing", "remote_model"):
             if k in body:
                 setattr(obj, k, body[k].strip() if isinstance(body[k], str) else body[k])

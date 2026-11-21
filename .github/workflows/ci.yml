@@ -48,6 +48,33 @@ jobs:
       - name: Platform detection
         run: python scripts/platform_probe.py
 
+  extras:
+    name: Integrations, typing, notebooks, docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install with every extra
+        run: python -m pip install -e ".[dev,all,typing,notebooks,docs]"
+      - name: Tests (integration tests run instead of skipping)
+        run: python -m pytest -q
+      - name: Type check
+        run: pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
+      - name: Notebooks
+        run: python -m pytest --nbmake examples/notebooks -q -p no:llmdyno
+      - name: Docs site
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+        run: mkdocs build --strict
+      - name: Package
+        run: |
+          python -m pip install build twine
+          python -m build
+          python -m twine check dist/*
+
   frontend:
     name: Web UI
     runs-on: ubuntu-latest

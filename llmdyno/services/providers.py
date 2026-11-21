@@ -52,6 +52,7 @@ def patch_provider(pid: str, body: dict):
     vendor = providers.BY_ID.get(p["vendor"], providers.BY_ID["custom"])
     with db.Session() as s:
         obj = s.get(db.Provider, pid)
+        assert obj is not None              # checked by _get() above
         if "name" in body:
             obj.name = body["name"].strip() or obj.name
         if "budget_usd" in body:
@@ -95,6 +96,7 @@ def test_provider(pid: str):
         res, ok, err = {"models": [], "latency_ms": None}, False, str(e)
     with db.Session() as s:
         obj = s.get(db.Provider, pid)
+        assert obj is not None              # checked by _get() above
         obj.last_check = {"ok": ok, "error": err, "at": time.time(), "latency_ms": res["latency_ms"], "n_models": len(res["models"])}
         if ok:
             obj.models_cache = res["models"]

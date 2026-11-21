@@ -1,5 +1,8 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """The web dashboard: start it on this data folder, or open a page of it."""
 from __future__ import annotations
+
+from typing import Any
 
 import threading
 import time
@@ -10,15 +13,15 @@ from ._backend import LocalBackend, backend
 
 __all__ = ["serve"]
 
-_server = {"thread": None, "url": None}
+_server: dict[str, Any] = {"thread": None, "url": None}
 
 
-def _ui_url(port=None):
+def _ui_url(port: Any=None):
     from .. import config
     return f"http://127.0.0.1:{port or int(config.get('port'))}"
 
 
-def _ui_up(url) -> bool:
+def _ui_up(url: Any) -> bool:
     import httpx
     try:
         return httpx.get(url + "/api/health", timeout=1.5).status_code < 500
@@ -31,7 +34,7 @@ def serve(port: int | None = None, *, open_browser: bool = True, block: bool = T
     b = backend()
     if not isinstance(b, LocalBackend):
         raise LLMDynoError("serve() starts the dashboard on this machine; a remote LLMDyno already serves its own")
-    if not b._ready:
+    if not b.ready:
         b.start()
     import uvicorn
     url = _ui_url(port)
@@ -60,7 +63,7 @@ def serve(port: int | None = None, *, open_browser: bool = True, block: bool = T
     return url
 
 
-def _open_ui(path: str) -> str:
+def open_ui(path: str) -> str:
     b = backend()
     if not isinstance(b, LocalBackend):                   # connected to a remote LLMDyno: open its dashboard
         from urllib.parse import quote

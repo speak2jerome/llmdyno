@@ -1,11 +1,12 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Benchmarks and suites: built-in, your own and imported (SWE-bench, Aider polyglot)."""
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Any, Sequence, Union
 
 from ..errors import NotFoundError
-from ._core import Handle, Job, _id, call, covers
+from ._core import Handle, Job, id_of, call, covers
 
 __all__ = ["Benchmark", "Suite", "list_benchmarks", "benchmark", "create_benchmark", "import_benchmark", "list_suites",
            "suite", "create_suite", "import_catalog", "import_swebench", "import_polyglot", "install_swebench_harness",
@@ -16,7 +17,7 @@ _SUMMARY_KEYS = ("id", "title", "category", "difficulty", "languages", "summary"
 
 
 @covers("GET /api/benchmarks")
-def list_benchmarks(category: str | None = None, search: str | None = None) -> list:
+def list_benchmarks(category: str | None = None, search: str | None = None) -> list[Any]:
     """Benchmarks in the data folder (built-in, your own and imported), as dicts with id, title, category, …"""
     out = []
     for b in call("benchmarks.list_benchmarks"):
@@ -30,14 +31,14 @@ def list_benchmarks(category: str | None = None, search: str | None = None) -> l
 
 
 @covers("GET /api/suites")
-def list_suites() -> list:
+def list_suites() -> list[Any]:
     """Suites (named groups of benchmarks): built-in ones plus yours and those created by imports."""
     return call("benchmarks.list_suites")
 
 
 @covers("POST /api/imports/swebench")
 def import_swebench(dataset: str = "verified_mini", *, limit: int | None = None,
-                    instance_ids: Sequence[str] | None = None, quiet: bool = False) -> dict:
+                    instance_ids: Sequence[str] | None = None, quiet: bool = False) -> dict[str, Any]:
     """Import SWE-bench tasks as benchmarks: dataset "verified" (500), "lite" (300) or "verified_mini" (50).
     Grading needs the official harness: setup(swebench=True). Returns the new benchmark ids and suite id."""
     r = call("imports.import_swebench", body={"dataset": dataset, "limit": limit or 0,
@@ -46,7 +47,7 @@ def import_swebench(dataset: str = "verified_mini", *, limit: int | None = None,
 
 
 @covers("POST /api/imports/polyglot")
-def import_polyglot(languages: Sequence[str] | None = None, *, quiet: bool = False) -> dict:
+def import_polyglot(languages: Sequence[str] | None = None, *, quiet: bool = False) -> dict[str, Any]:
     """Import Aider's polyglot benchmark (cpp, go, java, javascript, python, rust). Needs the toolchain image:
     setup(polyglot=True)."""
     r = call("imports.import_polyglot", body={"languages": list(languages) if languages else None})
@@ -54,20 +55,20 @@ def import_polyglot(languages: Sequence[str] | None = None, *, quiet: bool = Fal
 
 
 @covers("GET /api/imports")
-def import_catalog() -> dict:
+def import_catalog() -> dict[str, Any]:
     """What can be imported and what is ready: SWE-bench datasets and its harness, the polyglot languages, image and
     exercise cache, and how many of each are imported."""
     return call("imports.import_catalog")
 
 
 @covers("POST /api/imports/swebench/harness")
-def install_swebench_harness(quiet: bool = False) -> dict:
+def install_swebench_harness(quiet: bool = False) -> dict[str, Any]:
     """Install the official SWE-bench harness into its own virtual environment (about 250 MB)."""
     return Job(call("imports.install_swebench_harness")["job_id"]).wait(quiet=quiet)
 
 
 @covers("POST /api/imports/polyglot/image")
-def build_polyglot_image(quiet: bool = False) -> dict:
+def build_polyglot_image(quiet: bool = False) -> dict[str, Any]:
     """Build the polyglot toolchain image (C++, Go, Java, JavaScript, Rust; a few GB)."""
     return Job(call("imports.build_polyglot_image")["job_id"]).wait(quiet=quiet)
 
@@ -94,7 +95,7 @@ class Benchmark(Handle):
         return bool(self._data.get("builtin"))
 
     @property
-    def prompts(self) -> list:
+    def prompts(self) -> list[Any]:
         """The prompt of each stage, in order."""
         return list(self._data.get("prompts") or [])
 
@@ -103,12 +104,12 @@ class Benchmark(Handle):
         return super().refresh()
 
     @covers("GET /api/benchmarks/{bid}/spec")
-    def spec(self) -> dict:
+    def spec(self) -> dict[str, Any]:
         """The editable definition of one of your benchmarks (what create_benchmark() and update() take)."""
         return call("benchmarks.benchmark_spec", bid=self.id)
 
     @covers("PUT /api/benchmarks/{bid}")
-    def update(self, spec: dict) -> "Benchmark":
+    def update(self, spec: dict[str, Any]) -> "Benchmark":
         """Replace one of your benchmarks with a new spec (built-in ones are read-only: duplicate() them first)."""
         call("benchmarks.update_benchmark", bid=self.id, body=dict(spec))
         return self.refresh()
@@ -132,7 +133,7 @@ class Benchmark(Handle):
         return data
 
     @covers("POST /api/benchmarks/{bid}/validate")
-    def validate(self, wait: bool = True, quiet: bool = False) -> Union[dict, Job]:
+    def validate(self, wait: bool = True, quiet: bool = False) -> Union[dict[str, Any], Job]:
         """Check the grader: the starter workspace must fail it and the reference solution must pass. Returns the
         report (or the Job with wait=False). Needs Docker and the sandbox image."""
         job = Job(call("benchmarks.validate_benchmark", bid=self.id)["job_id"])
@@ -149,7 +150,7 @@ def benchmark(benchmark_id: str) -> Benchmark:
 
 
 @covers("POST /api/benchmarks")
-def create_benchmark(spec: dict) -> Benchmark:
+def create_benchmark(spec: dict[str, Any]) -> Benchmark:
     """Create your own benchmark from a spec, the same one the benchmark editor builds: id, title, prompts per stage,
     starter files, hidden tests or checks for the grader, an optional reference solution. See docs/BENCHMARKS.md."""
     return Benchmark(call("benchmarks.create_benchmark", body=dict(spec)))
@@ -171,7 +172,7 @@ class Suite(Handle):
         return self._data["name"]
 
     @property
-    def benchmark_ids(self) -> list:
+    def benchmark_ids(self) -> list[Any]:
         return list(self._data.get("benchmark_ids") or [])
 
     def refresh(self) -> "Suite":
@@ -182,12 +183,12 @@ class Suite(Handle):
         return self
 
     @covers("PUT /api/suites/{sid}")
-    def update(self, *, name: str | None = None, benchmarks: Sequence | None = None,
+    def update(self, *, name: str | None = None, benchmarks: Sequence[Any] | None = None,
                description: str | None = None) -> "Suite":
         """Rename it, change its description or its benchmarks (built-in suites are read-only)."""
-        body = {k: v for k, v in (("name", name), ("description", description)) if v is not None}
+        body: dict[str, Any] = {k: v for k, v in (("name", name), ("description", description)) if v is not None}
         if benchmarks is not None:
-            body["benchmark_ids"] = [_id(b) for b in benchmarks]
+            body["benchmark_ids"] = [id_of(b) for b in benchmarks]
         self._d = call("benchmarks.update_suite", sid=self.id, body=body)
         return self
 
@@ -206,7 +207,7 @@ def suite(suite_id: str) -> Suite:
 
 
 @covers("POST /api/suites")
-def create_suite(name: str, benchmarks: Sequence, description: str = "") -> Suite:
+def create_suite(name: str, benchmarks: Sequence[Any], description: str = "") -> Suite:
     """A new suite of benchmarks (Benchmark objects or ids)."""
     return Suite(call("benchmarks.create_suite", body={"name": name, "description": description,
-                                                       "benchmark_ids": [_id(b) for b in benchmarks]}))
+                                                       "benchmark_ids": [id_of(b) for b in benchmarks]}))

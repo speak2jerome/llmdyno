@@ -35,6 +35,7 @@ def retry_run(rid: str):
     plan = _get(db.Plan, r["plan_id"])
     with db.Session() as s:
         obj = s.get(db.Run, rid)
+        assert obj is not None              # checked by _get() above
         obj.status, obj.error, obj.stage, obj.metrics, obj.quality = "queued", "", "", {}, {}
         obj.correctness = obj.instruction_following = obj.wall_s = obj.cost_usd = None
         s.commit()

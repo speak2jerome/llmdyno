@@ -13,6 +13,8 @@ needs no body at all. Other marker keywords go to llmdyno.bench(). Fixtures: `ll
 machines without Docker or a GPU). Nothing here imports more than pytest until a marked test runs."""
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 _RUNS: dict = {}
@@ -40,7 +42,7 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip)
 
 
-def _library(config):
+def _library(config: Any) -> Any:
     import llmdyno as lib
     data = config.getoption("--llmdyno-data")
     if data and not _STATE.get("ready"):

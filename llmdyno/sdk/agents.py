@@ -1,3 +1,4 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Benchmark your own agent: python_harness() turns a Python function into a harness, so an agent built with LangGraph,
 the OpenAI Agents SDK, smolagents, PydanticAI or plain code runs in the same offline sandbox, behind the same proxy, with
 the same transcripts, budgets and grading as the built-in harnesses.
@@ -15,7 +16,7 @@ import base64
 import importlib.util
 import re
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Any, Sequence, Union
 
 from ..errors import InvalidError, NotFoundError
 from ._core import call, covers
@@ -56,7 +57,7 @@ if out is not None:
 '''
 
 
-def _sources(module: str, source) -> dict:
+def _sources(module: str, source: Any) -> dict[str, Any]:
     """{relative path: bytes} of the agent's code: one file, or a whole package folder."""
     if source is None:
         spec = importlib.util.find_spec(module.split(".")[0])
@@ -124,4 +125,6 @@ def python_harness(entrypoint: str, *, requirements: Sequence[str] = (), source:
         h = Harness(hid).refresh()
     else:
         h = Harness(call("harnesses.add_custom_harness", body=manifest))
-    return h.build(quiet=quiet) if build else h
+    if build:
+        h.build(quiet=quiet)
+    return h.refresh()

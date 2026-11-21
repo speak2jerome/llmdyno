@@ -43,7 +43,7 @@ def _table(rows: list, cols: list) -> str:
         for k, _, kind in cols:
             v = r.get(k)
             if kind == "score":
-                cells.append(_bar(v, COMPONENT_COLORS.get(k, PALETTE[0])))
+                cells.append(_bar(v, COMPONENT_COLORS.get(str(k), PALETTE[0])))
             elif kind == "status":
                 cells.append(f'<span style="color:{STATUS_COLORS.get(v, "#444")}">●</span> {_esc(v)}')
             elif kind == "money":
@@ -71,7 +71,7 @@ def plan_html(d: dict) -> str:
     counts = ", ".join(f"{k} {v}" for k, v in (d.get("counts") or {}).items())
     runs = [{**r, "correctness": None if r.get("correctness") is None else r["correctness"] * 100}
             for r in d.get("runs") or []]
-    head = (f"<p><b>{_esc(d.get('name'))}</b> &nbsp; <span style='color:{STATUS_COLORS.get(d.get('status'), '#444')}'>"
+    head = (f"<p><b>{_esc(d.get('name'))}</b> &nbsp; <span style='color:{STATUS_COLORS.get(str(d.get('status')), '#444')}'>"
             f"{_esc(d.get('status'))}</span> &nbsp; {_esc(counts)}</p>")
     return head + _table(runs[:200], [("benchmark_id", "Benchmark", "text"), ("profile_id", "Profile", "text"),
                                       ("harness_id", "Harness", "text"), ("iteration", "#", "text"),

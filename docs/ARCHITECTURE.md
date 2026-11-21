@@ -56,6 +56,14 @@ machine's API, which has the same names and parameters. SDK modules never import
 process. `tests/test_parity.py` maps every route to the library call that covers it (`@covers`), so a feature can't
 reach the dashboard without reaching Python too.
 
+### Remote access
+
+Requests from the server's own machine need nothing. Every other request, including one forwarded by a reverse proxy
+on the same machine, must present the API token (`auth.py`): an `Authorization: Bearer` header, or `?token=` for
+downloads and the WebSocket. One middleware in `server.py` checks it and logs the changes remote clients make. The
+library's `RemoteBackend` (`llmdyno/sdk/remote.py`) maps each service call to its route from the API's own route
+table, so `llmdyno.connect()` needs no list of endpoints to keep in step.
+
 ### Why no Redis / Celery / Postgres here
 
 An early prototype used Redis + Celery + Postgres. For a project that anyone clones, that is four extra services

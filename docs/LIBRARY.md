@@ -360,7 +360,16 @@ llmdyno plan retry PLAN_ID
 llmdyno --help; llmdyno run --help; llmdyno bench --help
 ```
 
-`llmdyno` alone starts the web app, as before. Errors print to stderr and exit with code 1.
+`llmdyno` alone starts the web app, as before. Errors print to stderr and exit with code 1. Two commands have no
+Python twin: `llmdyno ci` (fail a build on a score drop, see [INTEGRATIONS.md](INTEGRATIONS.md#ci-and-pytest)) and
+`llmdyno token` (the access token for remote clients, see [REMOTE.md](REMOTE.md)).
+
+## Integrations and remote mode
+
+Data frames, charts, notebooks, MLflow, Weights & Biases, Langfuse, OpenTelemetry, LiteLLM, Ollama, the Hugging Face
+Hub, your own LangGraph / OpenAI Agents SDK / smolagents / PydanticAI agent, Inspect AI and pytest: see
+[INTEGRATIONS.md](INTEGRATIONS.md). To run LLMDyno on a GPU box and use it from your laptop, see
+[REMOTE.md](REMOTE.md).
 
 ## The dashboard
 
@@ -431,11 +440,31 @@ with, so an error means the same thing from Python and over REST.
 | `list_jobs()`, `job(id)`, `clear_jobs()` | `Job` (`.status`, `.progress`, `.log`, `.wait()`, `.cancel()`) |
 | `start_docker()`, `repair_docker()`, `install_docker()`, `use_llama_cpp(path)` | messages |
 | `watch(plan or run or job, transcript=False)` | iterator of `Event` |
+| `python_harness("module:function", requirements=[...])` | `Harness` |
+| `local_servers()`, `ollama_model()`, `openai_compatible()`, `litellm_model()` | lists, `Profile` |
+| `compare_results(current, baseline)` | regression report |
+| `inspect_task()`, `import_inspect_samples()` | Inspect `Task`, `Suite` |
+| `load_results_from_hub(repo)` | `Results` |
+| `connect(url, token)`, `disconnect()`, `connection()` | the backend in use |
 | `serve()` | dashboard URL |
 | `llmdyno.aio.<any function>`, `aio.watch()`, `aio.call(fn, ...)` | the same, awaitable |
 
 Every object (`Profile`, `Plan`, `Job`, …) gives its raw data with `obj["field"]`, `obj.get("field")` and
 `obj.to_dict()`, and `obj.refresh()` fetches it again.
+
+## API stability
+
+LLMDyno follows [Semantic Versioning](https://semver.org). Everything in `llmdyno.__all__` (and the methods of the
+objects it returns) is the public API; modules and names that start with an underscore, and everything under
+`llmdyno.services`, `llmdyno.api` and the engine packages, are internal.
+
+- Until 1.0, a minor release (0.5 → 0.6) may change the public API; the CHANGELOG says what changed and how to adapt.
+- From 1.0, a public name is only removed or changed incompatibly in a major release. It is deprecated first: it keeps
+  working for at least one minor release and warns (`DeprecationWarning`) with what to use instead.
+- Results stay comparable: a result records the LLMDyno version that computed its scores, and scoring changes are
+  listed in the CHANGELOG.
+- The web API follows the library: each route has a library call (`tests/test_parity.py`), so a route changes when its
+  call does.
 
 ## Library and web app parity
 

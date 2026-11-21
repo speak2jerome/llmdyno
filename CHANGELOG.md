@@ -42,6 +42,30 @@ than modified. Patch releases (0.1.1) only fix bugs.
 - Library objects expose their data: `obj["field"]`, `obj.get()`, `obj.to_dict()` and `obj.refresh()`.
 - The full error family is public: `InvalidError`, `ForbiddenError`, `RiskNotAcknowledgedError`, `RateLimitError`,
   `UpstreamError` and `InsufficientStorageError` join `NotFoundError`, `ConflictError` and `PreflightError`.
+- **Integrations** with mainstream libraries, each an optional extra (`pip install "llmdyno[all]"` for all of them;
+  a missing one says what to install). See docs/INTEGRATIONS.md.
+  - Data and notebooks: `to_pandas()`, `to_polars()` and `to_parquet()` for every table and transcripts; rich tables
+    for `Results`, `Plan` and `Run` in Jupyter; `Plan.live()` widget; tqdm progress in `bench()`.
+  - Charts like the dashboard's: `results.plot.leaderboard()`, `.heatmap()`, `.pareto()`, `.radar()`, `.tokens()`,
+    in matplotlib or plotly.
+  - Tracking and tracing: `log_to_mlflow()`, `log_to_wandb()` (offline works), `log_to_langfuse()` and `to_otel()`
+    (GenAI semantic conventions, real timestamps); `bench(auto_log=...)`.
+  - Model gateways: a LiteLLM vendor and `litellm_model()` (Azure OpenAI, Bedrock, Vertex AI, …, prices from
+    LiteLLM's table), `local_servers()`, `ollama_model()` and `openai_compatible()`; the Hugging Face token from
+    `hf auth login` is reused; `Results.push_to_hub()` and `load_results_from_hub()`.
+  - Your own agent: `python_harness("my_agent:run", requirements=[...])` benchmarks a Python agent in the same
+    sandbox as the built-in harnesses, with templates for LangGraph, the OpenAI Agents SDK, smolagents and PydanticAI.
+  - Inspect AI: `inspect_task()`, `import_inspect_samples()`, `Results.to_inspect_log()`.
+  - CI: `llmdyno ci --baseline ... --max-drop 2` and `compare_results()`, a pytest plugin
+    (`@pytest.mark.llmdyno(min_score=...)`), and a GitHub Actions workflow in examples/ci.
+- **Remote mode**: `llmdyno serve --host 0.0.0.0` asks other machines for an access token (made on first use, shown
+  once, `llmdyno token --rotate` replaces it) and logs the changes they make; `llmdyno.connect(url, token)` sends every
+  library call to that server, with live events over its WebSocket; `--url` / `--api-token` on every command; the web
+  UI asks for the token when opened from another machine. Requests from the server's own machine need nothing, as
+  before. See docs/REMOTE.md.
+- A documentation site (MkDocs) with guides and an API reference generated from the code, and example notebooks that
+  CI runs.
+
 ### Changed
 
 - Internals: the web API's logic moved into `llmdyno/services` (one module per area) and the library into
@@ -52,10 +76,15 @@ than modified. Patch releases (0.1.1) only fix bugs.
 - Library calls raise the same errors the web API answers with (a missing benchmark is `NotFoundError`, a built-in one
   you try to edit is `ForbiddenError`, …) instead of Python's `KeyError` or `PermissionError`; the mapping lives in one
   place, `llmdyno.errors.from_exception`, used by both.
+- The `custom` vendor is no longer the only one that may run without an API key: vendors carry `key_optional`
+  (`custom` and the new `litellm`).
+- The library is type-checked: pyright strict on `llmdyno.sdk` and `llmdyno.errors` (fully typed signatures),
+  standard on the services, web API, CLI and integrations; CI runs it with every extra installed.
 
 ### Fixed
 
 - Uploading a file that is not a zip as a benchmark answered with a server error; it now says what is wrong (400).
+- A dependency action posted without an `action` answered with a server error; it is now a 400 naming the problem.
 
 ## [0.3.1] - 2026-11-22
 

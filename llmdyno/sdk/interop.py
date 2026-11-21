@@ -1,5 +1,8 @@
+# pyright: strict, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false
 """Working with other tools: Inspect AI tasks and datasets, and regression checks for CI."""
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from pathlib import Path
@@ -9,14 +12,14 @@ from ..errors import InvalidError
 __all__ = ["inspect_task", "import_inspect_samples", "compare_results"]
 
 
-def inspect_task(benchmarks, profile, harness: str = "pi", name: str = "llmdyno", **bench_options):
+def inspect_task(benchmarks: Any, profile: Any, harness: str = "pi", name: str = "llmdyno", **bench_options: Any):
     """An Inspect AI Task running LLMDyno benchmarks (or suites) with this profile and harness; evaluate it with
     inspect_ai.eval(task, model="none/none"). Needs "llmdyno[inspect]"."""
     from ..integrations.inspect_eval import inspect_task as make
     return make(benchmarks, profile, harness=harness, name=name, **bench_options)
 
 
-def import_inspect_samples(samples, prefix: str = "inspect", suite: str | None = None, answer_file: str = "answer.txt",
+def import_inspect_samples(samples: Any, prefix: str = "inspect", suite: str | None = None, answer_file: str = "answer.txt",
                            timeout_s: int = 600):
     """LLMDyno benchmarks from an Inspect AI dataset: the agent writes its answer to answer_file and the grader
     checks it holds the sample's target. Returns a Suite of them. Needs "llmdyno[inspect]"."""
@@ -24,7 +27,7 @@ def import_inspect_samples(samples, prefix: str = "inspect", suite: str | None =
     return imp(samples, prefix=prefix, suite=suite, answer_file=answer_file, timeout_s=timeout_s)
 
 
-def _leaderboard(x) -> list:
+def _leaderboard(x: Any) -> list[Any]:
     from .results import Results, results
     if isinstance(x, Results):
         return x.leaderboard()
@@ -41,8 +44,8 @@ def _leaderboard(x) -> list:
     return results(x).leaderboard()
 
 
-def compare_results(current, baseline, *, metric: str = "final", max_drop: float = 2.0,
-                    allow_missing: bool = False) -> dict:
+def compare_results(current: Any, baseline: Any, *, metric: str = "final", max_drop: float = 2.0,
+                    allow_missing: bool = False) -> dict[str, Any]:
     """Compare results with a baseline, configuration by configuration (profile × harness), for CI. current and
     baseline are Results, plan ids, or results JSON files (Results.to_json(), `llmdyno results --json`).
     A configuration regresses when its metric (final, correctness, quality, … on 0-100) drops by more than max_drop
