@@ -36,7 +36,7 @@ The cost of a local run is the GPU's electricity at your rate (Settings); cloud 
 ## Install
 
 ```bash
-pip install git+https://github.com/speak2jerome/llmdyno.git        # or the wheel from a GitHub release
+pip install llmdyno                      # add [pandas] for Results.to_pandas(): pip install "llmdyno[pandas]"
 ```
 
 Requirements are the same as for the app: Python 3.11+, Docker running (agents work in sandboxes), and for local models

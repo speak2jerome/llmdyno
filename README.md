@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="LLMDyno: a pixel-art dinosaur with a rocket strapped to its back, running on a treadmill" width="100%">
+  <img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/banner.svg" alt="LLMDyno: a pixel-art dinosaur with a rocket strapped to its back, running on a treadmill" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml"><img src="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/speak2jerome/llmdyno/releases"><img src="https://img.shields.io/github/v/release/speak2jerome/llmdyno?include_prereleases&label=release" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <a href="https://pypi.org/project/llmdyno/"><img src="https://img.shields.io/pypi/v/llmdyno" alt="PyPI"></a>
+  <a href="https://github.com/speak2jerome/llmdyno/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" alt="Windows, Linux and macOS">
   <img src="https://img.shields.io/badge/arch-x86--64%20%7C%20ARM64%20%7C%20Apple%20Silicon-lightgrey" alt="x86-64, ARM64 and Apple Silicon">
@@ -26,7 +27,7 @@ measurements. It works on Windows, Linux and macOS, on x86-64, ARM64 and Apple S
 It's a dyno for models: it measures what a model actually does on your machine, with your settings, rather than what
 a leaderboard says it does on someone else's.
 
-<p align="center"><img src="docs/images/results.png" alt="LLMDyno results dashboard: leaderboard with vendor logos, per-benchmark heatmap and radar chart" width="100%"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/results.png" alt="LLMDyno results dashboard: leaderboard with vendor logos, per-benchmark heatmap and radar chart" width="100%"></p>
 
 ## Contents
 
@@ -72,7 +73,7 @@ a model failed.
 - Warnings before you run: out of memory, **VRAM spilling into shared memory**, CPU offload, context shorter than the
   task needs, risky KV quantization, missing tool-calling support. Most come with a one-click fix.
 
-<img src="docs/images/profile-editor.png" alt="LLM profile editor with live VRAM projection, spill warning and context chart" width="100%">
+<img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/profile-editor.png" alt="LLM profile editor with live VRAM projection, spill warning and context chart" width="100%">
 
 **LLM profiles**: a model plus its exact settings (context, KV cache, offload, MoE experts on CPU, sampling, reasoning).
 A quick test loads the model and measures real VRAM, decode speed and tool calling in about 20 seconds.
@@ -85,7 +86,7 @@ never enter a sandbox. Spend caps per provider and per plan are enforced by a pr
 custom harnesses from a JSON manifest. A proxy records every request, so transcripts (thinking, tool calls, results)
 look the same whichever harness ran.
 
-<img src="docs/images/run-transcript.png" alt="Live run transcript with tool calls, token counts and decode speed" width="100%">
+<img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/run-transcript.png" alt="Live run transcript with tool calls, token counts and decode speed" width="100%">
 
 **Benchmarks**: six built-in tasks with hidden tests (a CLI smoke test, a Flask site, a FastAPI service with a
 TypeScript client, a five-stage iterative build, a data pipeline with a churn model, and a bug-fix task). Write your
@@ -113,8 +114,8 @@ judges deliberate, and freezes red on a panic stop. The browser tab icon and tit
 progress from another tab.
 
 <p align="center">
-  <img src="docs/images/dyno-running.svg" alt="Animated mascot: running a benchmark" width="120">
-  <img src="docs/images/dyno-judging.svg" alt="Animated mascot: waiting on the podium while judges review" width="120">
+  <img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/dyno-running.svg" alt="Animated mascot: running a benchmark" width="120">
+  <img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/dyno-judging.svg" alt="Animated mascot: waiting on the podium while judges review" width="120">
 </p>
 
 ## Quick start
@@ -122,6 +123,15 @@ progress from another tab.
 **Requirements**: Windows 10/11, Linux or macOS 13+, on x86-64 or ARM64 (Apple Silicon included), Python 3.11+, and
 Docker (Docker Desktop on Windows and macOS). A GPU is recommended for local models (NVIDIA, AMD, Intel, or any Apple
 Silicon Mac); cloud-only use works without one.
+
+From PyPI:
+
+```bash
+pip install llmdyno
+llmdyno serve --open        # the web app; or use it from Python (below)
+```
+
+Or from a clone, with a setup script that creates a virtual environment for you:
 
 ```bash
 git clone https://github.com/speak2jerome/llmdyno.git
@@ -172,7 +182,7 @@ print(results)                      # leaderboard; results.to_pandas(), .to_csv(
 `llmdyno.setup()` installs what is missing (images, llama.cpp), `bench()` checks the plan before it starts and raises
 `PreflightError` with the reasons, and Ctrl+C cancels cleanly. It shares the app's data folder, so plans started from
 Python appear in the dashboard. The full guide, including SWE-bench, judges and the data folder:
-[docs/LIBRARY.md](docs/LIBRARY.md). Runnable examples are in [examples/](examples/).
+[docs/LIBRARY.md](https://github.com/speak2jerome/llmdyno/blob/main/docs/LIBRARY.md). Runnable examples are in [examples/](https://github.com/speak2jerome/llmdyno/tree/main/examples).
 
 ## Round 1 results: 15 configurations on an RTX 5080
 
@@ -269,8 +279,8 @@ flowchart LR
 - Hidden tests and code-quality probes run in a separate sandbox after the agent finishes, so the agent never sees them.
 - Everything runs as one Python process with SQLite; Docker is only used for the sandboxes.
 
-More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Adding things: [harnesses](docs/HARNESSES.md),
-[benchmarks](docs/BENCHMARKS.md).
+More detail: [docs/ARCHITECTURE.md](https://github.com/speak2jerome/llmdyno/blob/main/docs/ARCHITECTURE.md). Adding things: [harnesses](https://github.com/speak2jerome/llmdyno/blob/main/docs/HARNESSES.md),
+[benchmarks](https://github.com/speak2jerome/llmdyno/blob/main/docs/BENCHMARKS.md).
 
 ## Supported harnesses, providers and hardware
 
@@ -344,7 +354,7 @@ Codex CLI passed 6/7.
 
 ### Can I add my own benchmark?
 Yes. Use the editor in the app, or write a folder with a prompt, starter files, hidden tests and an optional
-reference solution. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+reference solution. See [docs/BENCHMARKS.md](https://github.com/speak2jerome/llmdyno/blob/main/docs/BENCHMARKS.md).
 
 ### Does it work without a GPU?
 Yes, for cloud models. Local models also run on the CPU, but agentic tasks with long contexts will be very slow, and
@@ -352,17 +362,17 @@ LLMDyno tells you so up front.
 
 ## Contributing
 
-Bug reports, new benchmarks, harness adapters and provider presets are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
-Please report security issues privately as described in [SECURITY.md](SECURITY.md).
+Bug reports, new benchmarks, harness adapters and provider presets are welcome. See [CONTRIBUTING.md](https://github.com/speak2jerome/llmdyno/blob/main/CONTRIBUTING.md).
+Please report security issues privately as described in [SECURITY.md](https://github.com/speak2jerome/llmdyno/blob/main/SECURITY.md).
 
 ## Releases and versioning
 
 LLMDyno follows [Semantic Versioning](https://semver.org). It is in the 0.x series: minor releases may change the API,
 data layout or database schema (with automatic migrations), and patch releases only fix bugs. Every run records the
-LLMDyno version that produced it, and exports carry it in the file name. See [CHANGELOG.md](CHANGELOG.md) and
-[docs/RELEASING.md](docs/RELEASING.md).
+LLMDyno version that produced it, and exports carry it in the file name. See [CHANGELOG.md](https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md) and
+[docs/RELEASING.md](https://github.com/speak2jerome/llmdyno/blob/main/docs/RELEASING.md).
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Third-party components and trademarks are listed in [NOTICE.md](NOTICE.md). If you use
-LLMDyno in research, please cite it ([CITATION.cff](CITATION.cff)).
+MIT, see [LICENSE](https://github.com/speak2jerome/llmdyno/blob/main/LICENSE). Third-party components and trademarks are listed in [NOTICE.md](https://github.com/speak2jerome/llmdyno/blob/main/NOTICE.md). If you use
+LLMDyno in research, please cite it ([CITATION.cff](https://github.com/speak2jerome/llmdyno/blob/main/CITATION.cff)).

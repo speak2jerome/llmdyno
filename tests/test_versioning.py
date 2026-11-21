@@ -70,3 +70,10 @@ def test_newer_database_is_refused(tmp_path):
     con.close()
     with pytest.raises(RuntimeError, match="newer LLMDyno"):
         db._migrate(create_engine(f"sqlite:///{path}"))
+
+
+def test_readme_links_work_on_pypi():
+    """README.md is the PyPI project page, where relative links and images are broken: they must be absolute."""
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    relative = re.findall(r'(?:src|href)="(?!https?:|#|mailto:)[^"]+"|\]\((?!https?:|#|mailto:)[^)\s]+\)', text)
+    assert not relative, f"make these absolute (raw.githubusercontent.com for images): {relative}"
