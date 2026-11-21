@@ -5,7 +5,7 @@
     python scripts/bump_version.py 0.3.0-rc.1   # an explicit version
 
 The single source of truth is llmdyno/__init__.py (pyproject reads it through hatch). This script also updates
-frontend/package.json and package-lock.json, and turns the CHANGELOG's "Unreleased" section into the new release.
+frontend/package.json, package-lock.json, CITATION.cff and the bug-report template, and turns the CHANGELOG's "Unreleased" section into the new release.
 It does not commit or tag; it prints the commands to do that.
 """
 import datetime
@@ -19,6 +19,8 @@ INIT = ROOT / "llmdyno" / "__init__.py"
 PKG = ROOT / "frontend" / "package.json"
 LOCK = ROOT / "frontend" / "package-lock.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
+CITATION = ROOT / "CITATION.cff"
+BUG_TEMPLATE = ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$")
 REPO = "https://github.com/speak2jerome/llmdyno"
 
@@ -74,6 +76,15 @@ def main():
     if LOCK.exists():
         write_json(LOCK, lock)
     roll_changelog(old, new)
+    if CITATION.exists():
+        text = re.sub(r"^version: .*$", f"version: {new}", CITATION.read_text(encoding="utf-8"), count=1, flags=re.M)
+        text = re.sub(r'^date-released: .*$', f'date-released: "{datetime.date.today().isoformat()}"', text, count=1,
+                      flags=re.M)
+        CITATION.write_text(text, encoding="utf-8")
+    if BUG_TEMPLATE.exists():
+        BUG_TEMPLATE.write_text(BUG_TEMPLATE.read_text(encoding="utf-8").replace(f'placeholder: "{old}"',
+                                                                                 f'placeholder: "{new}"'),
+                                encoding="utf-8")
     print(f"{old} -> {new}\n\nNext:\n  cd frontend && npm run build && cd ..\n  git commit -am \"Release v{new}\"\n"
           f"  git tag -a v{new} -m \"LLMDyno {new}\"\n  git push && git push --tags")
 

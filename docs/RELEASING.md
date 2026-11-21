@@ -18,7 +18,7 @@ time from `frontend/package.json`, which the bump script keeps in step. CI fails
    python scripts/bump_version.py minor        # or patch, or an explicit version such as 0.3.0-rc.1
    ```
 
-   This updates `llmdyno/__init__.py`, `frontend/package.json` and `package-lock.json`, and turns the Unreleased
+   This updates `llmdyno/__init__.py`, `frontend/package.json`, `package-lock.json`, `CITATION.cff` and the bug-report template, and turns the Unreleased
    section of the changelog into the new release.
 3. Rebuild the UI so the committed bundle carries the new version:
 
