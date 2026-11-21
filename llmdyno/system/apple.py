@@ -64,6 +64,15 @@ def working_set_limit_mib(ram_bytes, wired_limit_mb=0):
     return int(ram_mib * (2 / 3 if ram_mib <= 36 * 1024 else 3 / 4))
 
 
+def suggested_wired_limit_mib(ram_mib, current_limit_mib, reserve_mib=8192):
+    """A higher iogpu.wired_limit_mb worth suggesting: all RAM but 8 GB for macOS (and Docker), and only when that
+    is at least 1 GB above the current limit. None on small Macs, where the default already leaves less than that."""
+    if not ram_mib:
+        return None
+    target = int(ram_mib - reserve_mib)
+    return target if target >= (current_limit_mib or 0) + 1024 else None
+
+
 def gpu_from_profiler(text):
     """`system_profiler SPDisplaysDataType -json` -> (chip name, GPU core count) of the first Apple GPU."""
     try:

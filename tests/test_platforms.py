@@ -86,6 +86,14 @@ def test_metal_working_set_defaults_and_override():
     assert apple.working_set_limit_mib(64 * 2**30, wired_limit_mb=57344) == 57344
 
 
+def test_wired_limit_suggestion_leaves_room_for_macos():
+    assert apple.suggested_wired_limit_mib(36 * 1024, 24576) == 28672          # 36 GB Mac: raise to RAM - 8 GB
+    assert apple.suggested_wired_limit_mib(128 * 1024, 98304) == 122880
+    assert apple.suggested_wired_limit_mib(16 * 1024, 10922) is None           # small Macs: nothing worth raising
+    assert apple.suggested_wired_limit_mib(7 * 1024, 4778) is None             # the 7 GB CI runner
+    assert apple.suggested_wired_limit_mib(0, 0) is None
+
+
 def test_ioreg_and_profiler_parsing():
     st = apple.parse_ioreg_stats(IOREG)
     assert st == {"in_use_bytes": 2 * 2**30, "alloc_bytes": 4 * 2**30, "util_pct": 37}

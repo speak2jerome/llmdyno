@@ -82,12 +82,12 @@ def check(force=False):
     if g and g.get("vendor") == "Apple":
         lim = g.get("vram_total_mib") or 0
         ram = g.get("ram_total_mib") or 0
-        suggest = max(lim, int(ram - 8192)) if ram else lim
+        suggest = sysspecs.apple.suggested_wired_limit_mib(ram, lim)
         out.append(_dep("gpu_memory_limit", "GPU memory limit", "optional", True,
                         f"Metal can use {lim / 1024:.0f} of {ram / 1024:.0f} GB unified memory"
                         + (" (raised with iogpu.wired_limit_mb)" if g.get("wired_limit_set") else " (macOS default)"),
                         [{"id": "copy", "label": "Copy command to raise it", "kind": "copy",
-                          "text": f"sudo sysctl iogpu.wired_limit_mb={suggest}"}] if ram and suggest > lim + 1024 else [],
+                          "text": f"sudo sysctl iogpu.wired_limit_mb={suggest}"}] if suggest else [],
                         "macOS reserves part of unified memory for the system. Raising the limit lets larger models stay on "
                         "the GPU; it resets on reboot. Leave at least 8 GB for macOS and Docker.", group="local"))
     if g and g["vendor"] == "NVIDIA":

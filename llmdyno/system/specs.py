@@ -391,10 +391,11 @@ def summarize(s):
         lim = g["vram_total_mib"] / 1024
         notes.append({"level": "info", "text": f"{g['chip']} with {ram_gb:.0f} GB unified memory: Metal lets the GPU use "
                       f"about {lim:.0f} GB, so models up to about {max(lim - 3, 0):.0f} GB of weights fit with a 64k context."})
-        if not g.get("wired_limit_set"):
+        raise_to = apple.suggested_wired_limit_mib(ram_gb * 1024, g["vram_total_mib"])
+        if raise_to and not g.get("wired_limit_set"):
             notes.append({"level": "info", "text": "To give the GPU more of the unified memory, run "
-                          f"sudo sysctl iogpu.wired_limit_mb={int(ram_gb * 1024 * 0.85)} (it resets at reboot; leave at "
-                          "least 8 GB for macOS)."})
+                          f"sudo sysctl iogpu.wired_limit_mb={raise_to} (it resets at reboot; this leaves 8 GB for "
+                          "macOS and Docker)."})
         notes.append({"level": "warning", "text": "If a model needs more than the GPU's share, macOS compresses and swaps "
                       "memory instead of failing, and decoding slows to a crawl. LLMDyno refuses such profiles unless "
                       "the plan allows it."})
