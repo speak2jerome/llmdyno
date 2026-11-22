@@ -3,7 +3,7 @@
 LLMDyno is a Python app that runs agents in Docker. From JavaScript or TypeScript there are three ways to use it:
 
 - **`npx llmdyno`** starts it.
-- **The `llmdyno` npm package** drives it from Node, Bun, Deno or a browser, with the same calls as the Python library.
+- **The `llmdyno` npm package** drives it from Node, with the same calls as the Python library.
 - **`node_harness()`** benchmarks your own TypeScript agent, built with the Vercel AI SDK, Mastra, LangChain.js, the
   OpenAI Agents SDK or plain code.
 
@@ -29,7 +29,9 @@ LLMDyno.
 npm install llmdyno
 ```
 
-It needs Node 22 or later, or any runtime with `fetch` and `WebSocket`. It has no dependencies.
+It needs Node 22 or later and has no dependencies. It uses only `fetch` and `WebSocket`, so other runtimes that have
+both, such as Bun and Deno, should work, but they aren't tested. In a browser it works only on pages that the LLMDyno
+server serves itself, because the server sends no CORS headers.
 
 ```ts
 import { connect } from "llmdyno";

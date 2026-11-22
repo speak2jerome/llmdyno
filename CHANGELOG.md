@@ -9,6 +9,21 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-22
+
+### Fixed
+
+- The JavaScript docs said the client runs in browsers, Bun and Deno. It is tested on Node 22 and 24 only. In a
+  browser it works only on pages that the LLMDyno server serves itself, because the server sends no CORS headers.
+- `Profile.check()` in the JavaScript client threw at once for a cloud profile instead of returning a rejected
+  promise.
+
+### Changed
+
+- The README has an npm badge.
+- The Release workflow now publishes the npm package too, through npm's trusted publishing and with provenance, so no
+  token is stored.
+
 ## [0.6.0] - 2026-11-22
 
 ### Added
@@ -231,7 +246,8 @@ First public release.
   title follow it.
 - Bundled sample results: 15 configurations × 5 tasks on an RTX 5080, judged by two models.
 
-[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/speak2jerome/llmdyno/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/speak2jerome/llmdyno/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/speak2jerome/llmdyno/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/speak2jerome/llmdyno/compare/v0.3.0...v0.3.1

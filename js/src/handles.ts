@@ -54,7 +54,7 @@ export class Profile {
   }
 
   /** Memory fit of a local profile: verdict ("fits", "tight", "spill", "oom" …), projected VRAM and warnings. */
-  check(exact = false): Promise<Json> {
+  async check(exact = false): Promise<Json> {
     if (this.kind !== "local") throw new LLMDynoError("memory checks are for local profiles");
     return this.client.call("profiles.check_profile", {
       body: { model_id: this.data.model_id, params: this.params, exact, profile_id: this.id },

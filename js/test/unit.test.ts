@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   API_METHODS, Client, ConflictError, ForbiddenError, InvalidError, LLMDynoError, NotFoundError, PreflightError, Plan,
-  ROUTES, Results, VERSION, connect,
+  Profile, ROUTES, Results, VERSION, connect,
 } from "../src/index.ts";
 
 type Handler = (req: { method: string; url: URL; body: unknown; headers: Record<string, string> }) => Response | Promise<Response>;
@@ -119,6 +119,15 @@ test("bench() stops on blocking problems and on unacknowledged risks", async () 
     name: "", profile_ids: ["prof_1"], harness_ids: ["pi"], benchmark_ids: ["t1"], iterations: 1,
     options: { budget_usd: 2, quality: true }, start: true, acknowledge_risks: true,
   });
+});
+
+test("Profile.check() returns a rejected promise for a cloud profile instead of throwing", async () => {
+  const { fn, seen } = fakeFetch(() => json({}));
+  const p = new Profile(new Client("http://box", { fetch: fn }), { id: "prof_1", name: "gpt", kind: "cloud" });
+  let pending: Promise<unknown> | undefined;
+  assert.doesNotThrow(() => { pending = p.check(); });
+  await assert.rejects(pending!, /memory checks are for local profiles/);
+  assert.equal(seen.length, 0);
 });
 
 test("cloudModel() rejects unknown settings before calling anything that changes the server", async () => {

@@ -6,8 +6,7 @@ the result and blind LLM judges review the code, alongside speed, VRAM and cost.
 
 This package gives you two things:
 
-- **A typed client.** It drives a LLMDyno server from Node, Bun, Deno or the browser, with the same calls as the Python
-  library.
+- **A typed client.** It drives a LLMDyno server from Node 22 or later, with the same calls as the Python library.
 - **`npx llmdyno`.** It starts that server for you.
 
 LLMDyno itself is a Python app that runs agents in Docker, so you need Python 3.11+ and Docker on the machine that
@@ -67,6 +66,10 @@ await dyno.api.runs.runGpu({ rid: run.id, max_points: 200 });
 
 The library raises the same errors as the Python one: `NotFoundError`, `ConflictError`, `InvalidError`,
 `PreflightError` and the rest, each with the HTTP `status`.
+
+It uses only `fetch` and `WebSocket`. Other runtimes that have both, such as Bun and Deno, should work but aren't
+tested. In a browser it works only on pages that the LLMDyno server serves itself, because the server sends no CORS
+headers.
 
 On another machine, start the server with `llmdyno serve --host 0.0.0.0`. Then connect with its access token:
 `connect("http://gpu-box:8777", { token })`.

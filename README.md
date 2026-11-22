@@ -6,6 +6,7 @@
   <a href="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml"><img src="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/speak2jerome/llmdyno/releases"><img src="https://img.shields.io/github/v/release/speak2jerome/llmdyno?include_prereleases&label=release" alt="Latest release"></a>
   <a href="https://pypi.org/project/llmdyno/"><img src="https://img.shields.io/pypi/v/llmdyno" alt="PyPI"></a>
+  <a href="https://www.npmjs.com/package/llmdyno"><img src="https://img.shields.io/npm/v/llmdyno" alt="npm"></a>
   <a href="https://speak2jerome.github.io/llmdyno/"><img src="https://img.shields.io/badge/docs-speak2jerome.github.io-blue" alt="Documentation"></a>
   <a href="https://github.com/speak2jerome/llmdyno/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
