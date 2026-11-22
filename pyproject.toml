@@ -35,13 +35,13 @@ classifiers = [
 ]
 
 dependencies = [
-  "fastapi==0.115.6",
-  "uvicorn[standard]==0.34.0",
-  "sqlalchemy==2.0.36",
-  "pydantic==2.10.4",
+  "fastapi==0.165.0",
+  "uvicorn[standard]==0.54.0",
+  "sqlalchemy==2.1.9",
+  "pydantic==2.14.3",
   "httpx==0.28.1",
-  "psutil==6.1.1",
-  "python-multipart==0.0.20",
+  "psutil==7.2.2",
+  "python-multipart==0.0.34",
 ]
 
 [project.urls]
@@ -51,7 +51,7 @@ Changelog = "https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md"
 Issues = "https://github.com/speak2jerome/llmdyno/issues"
 
 [project.optional-dependencies]
-dev = ["pytest==8.3.4", "ruff==0.8.4"]
+dev = ["pytest==9.2.0", "ruff==0.17.5"]
 # Integrations are optional; each import is lazy and a missing extra says what to install.
 pandas = ["pandas>=2.0"]
 data = ["pandas>=2.0", "polars>=1.0", "pyarrow>=15"]
