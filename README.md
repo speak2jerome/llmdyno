@@ -6,6 +6,7 @@
   <a href="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml"><img src="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/speak2jerome/llmdyno/releases"><img src="https://img.shields.io/github/v/release/speak2jerome/llmdyno?include_prereleases&label=release" alt="Latest release"></a>
   <a href="https://pypi.org/project/llmdyno/"><img src="https://img.shields.io/pypi/v/llmdyno" alt="PyPI"></a>
+  <a href="https://speak2jerome.github.io/llmdyno/"><img src="https://img.shields.io/badge/docs-speak2jerome.github.io-blue" alt="Documentation"></a>
   <a href="https://github.com/speak2jerome/llmdyno/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" alt="Windows, Linux and macOS">
@@ -195,10 +196,11 @@ The library can do everything the dashboard does, and every call is also a comma
 
 With `llmdyno.connect()`, it drives LLMDyno on another machine.
 
-Guides:
-- [the Python library and CLI](https://github.com/speak2jerome/llmdyno/blob/main/docs/LIBRARY.md)
-- [integrations](https://github.com/speak2jerome/llmdyno/blob/main/docs/INTEGRATIONS.md)
-- [remote mode](https://github.com/speak2jerome/llmdyno/blob/main/docs/REMOTE.md)
+The [documentation site](https://speak2jerome.github.io/llmdyno/) has the guides and an API reference generated from the code:
+- [the Python library and CLI](https://speak2jerome.github.io/llmdyno/LIBRARY/)
+- [integrations](https://speak2jerome.github.io/llmdyno/INTEGRATIONS/)
+- [remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/)
+- [API reference](https://speak2jerome.github.io/llmdyno/reference/)
 
 Runnable examples and notebooks are in [examples/](https://github.com/speak2jerome/llmdyno/tree/main/examples).
 

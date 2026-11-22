@@ -46,7 +46,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/speak2jerome/llmdyno"
-Documentation = "https://github.com/speak2jerome/llmdyno#readme"
+Documentation = "https://speak2jerome.github.io/llmdyno/"
 Changelog = "https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md"
 Issues = "https://github.com/speak2jerome/llmdyno/issues"
 

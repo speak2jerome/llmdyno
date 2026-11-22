@@ -9,6 +9,11 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+### Changed
+
+- The documentation site is live at https://speak2jerome.github.io/llmdyno/. The README and the package's
+  Documentation link now point to it.
+
 ## [0.5.0] - 2026-11-22
 
 There is no 0.4.0. Full library parity, the integrations and remote mode ship together in this release.
