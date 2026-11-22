@@ -1,6 +1,6 @@
 # LLMDyno
 
-> LLMDyno is an open-source (MIT) benchmark for running local and cloud LLMs as coding agents. Local models run as GGUF files through llama.cpp on your own GPU; cloud models go through OpenAI, Anthropic, Gemini, DeepSeek, Kimi, Qwen, LiteLLM or any OpenAI-compatible server. Agent harnesses (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent, or your own Python agent) work on multi-file coding tasks in offline Docker sandboxes. Hidden tests, static analysis, behaviour probes and blind LLM judges score the result, alongside speed, VRAM and cost. It is a web dashboard, a Python library (`pip install llmdyno`, `import llmdyno`) and a command line (`llmdyno`), all working on the same data.
+> LLMDyno is an open-source (MIT) benchmark for running local and cloud LLMs as coding agents. Local models run as GGUF files through llama.cpp on your own GPU; cloud models go through OpenAI, Anthropic, Gemini, DeepSeek, Kimi, Qwen, LiteLLM or any OpenAI-compatible server. Agent harnesses (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent, or your own Python agent) work on multi-file coding tasks in offline Docker sandboxes. Hidden tests, static analysis, behaviour probes and blind LLM judges score the result, alongside speed, VRAM and cost. It is a web dashboard, a Python library (`pip install llmdyno`, `import llmdyno`) and a command line (`llmdyno`), all working on the same data, plus a TypeScript client on npm (`npm install llmdyno`, `npx llmdyno`).
 
 Key facts:
 
@@ -11,6 +11,8 @@ Key facts:
 - It also runs SWE-bench (official harness) and the Aider polyglot benchmark, and shows Artificial Analysis reference numbers.
 - Optional extras add pandas/polars, Jupyter, matplotlib/plotly, MLflow, Weights & Biases, Langfuse, OpenTelemetry, LiteLLM, the Hugging Face Hub, Inspect AI and a pytest plugin.
 - Remote mode: `llmdyno serve --host 0.0.0.0` on the GPU machine, `llmdyno.connect(url, token)` from anywhere.
+- JavaScript and TypeScript: `npx llmdyno` starts it; `import { connect } from "llmdyno"` gives the same calls as the Python library, with every web API operation typed under `dyno.api`.
+- Your own agent as a harness: `llmdyno.python_harness("my_agent:run")` for Python (LangGraph, OpenAI Agents SDK, smolagents, PydanticAI) and `llmdyno.node_harness("agent.ts:run")` for TypeScript (Vercel AI SDK, Mastra, LangChain.js, OpenAI Agents SDK).
 
 ## Docs
 
@@ -18,6 +20,7 @@ Key facts:
 - [Python library and CLI](https://speak2jerome.github.io/llmdyno/LIBRARY/): models, profiles, plans, runs, results, judging, the command line, API stability
 - [Integrations](https://speak2jerome.github.io/llmdyno/INTEGRATIONS/): data frames, notebooks, charts, experiment tracking, tracing, model gateways, the Hub, your own agent, Inspect AI, pytest and CI
 - [Remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/): run on a GPU machine and drive it from elsewhere with an access token
+- [JavaScript and TypeScript](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/): npx llmdyno, the npm client, and benchmarking TypeScript agents
 - [Writing a benchmark](https://speak2jerome.github.io/llmdyno/BENCHMARKS/): prompts, starter files, hidden tests, reference solutions
 - [Adding a harness](https://speak2jerome.github.io/llmdyno/HARNESSES/): custom harnesses from the UI or as Python adapters
 
@@ -46,4 +49,5 @@ Key facts:
 - [Releasing](https://speak2jerome.github.io/llmdyno/RELEASING/)
 - [Source code on GitHub](https://github.com/speak2jerome/llmdyno)
 - [Package on PyPI](https://pypi.org/project/llmdyno/)
+- [Package on npm](https://www.npmjs.com/package/llmdyno)
 - [Changelog](https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md)

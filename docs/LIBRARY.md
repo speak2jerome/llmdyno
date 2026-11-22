@@ -441,6 +441,7 @@ with, so an error means the same thing from Python and over REST.
 | `start_docker()`, `repair_docker()`, `install_docker()`, `use_llama_cpp(path)` | messages |
 | `watch(plan or run or job, transcript=False)` | iterator of `Event` |
 | `python_harness("module:function", requirements=[...])` | `Harness` |
+| `node_harness("agent.ts:run", packages=[...])` | `Harness` |
 | `local_servers()`, `ollama_model()`, `openai_compatible()`, `litellm_model()` | lists, `Profile` |
 | `compare_results(current, baseline)` | regression report |
 | `inspect_task()`, `import_inspect_samples()` | Inspect `Task`, `Suite` |

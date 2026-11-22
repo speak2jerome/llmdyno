@@ -1,0 +1,62 @@
+{
+  "name": "llmdyno",
+  "version": "0.5.0",
+  "description": "Benchmark local and cloud LLMs as coding agents from JavaScript or TypeScript: a typed client for the LLMDyno server, and npx llmdyno to start it.",
+  "keywords": [
+    "llm",
+    "benchmark",
+    "coding-agent",
+    "llm-evaluation",
+    "agent-benchmark",
+    "llama.cpp",
+    "local-llm",
+    "swe-bench",
+    "vercel-ai-sdk",
+    "mastra",
+    "langchain",
+    "openai-agents",
+    "typescript"
+  ],
+  "homepage": "https://speak2jerome.github.io/llmdyno/JAVASCRIPT/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/speak2jerome/llmdyno.git",
+    "directory": "js"
+  },
+  "bugs": "https://github.com/speak2jerome/llmdyno/issues",
+  "license": "MIT",
+  "author": "speak2jerome",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "llmdyno": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "node --test --disable-warning=ExperimentalWarning test/unit.test.ts",
+    "test:live": "node --test --disable-warning=ExperimentalWarning test/live.test.ts",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2"
+  }
+}

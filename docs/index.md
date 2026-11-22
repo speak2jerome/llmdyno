@@ -8,7 +8,7 @@ that records every request and enforces budgets. The results come from four sour
 behaviour probes and blind LLM judges. Before a local model downloads, LLMDyno tells you whether it will fit in your
 GPU's memory.
 
-It is a web dashboard, a Python library and a command line, all working on the same data.
+It is a web dashboard, a Python library and a command line, all working on the same data. From JavaScript or TypeScript, `npx llmdyno` starts it and the `llmdyno` npm package drives it.
 
 ```bash
 pip install llmdyno
@@ -36,6 +36,7 @@ results.plot.leaderboard()
     - LiteLLM and Ollama, and the Hugging Face Hub;
     - your own LangGraph or other agent, Inspect AI, and pytest and CI.
 - **[Remote mode](REMOTE.md)**: run it on the GPU box, drive it from your laptop.
+- **[JavaScript and TypeScript](JAVASCRIPT.md)**: `npx llmdyno`, the npm client, and benchmarking your own TypeScript agent.
 - **[Benchmarks](BENCHMARKS.md)** and **[Harnesses](HARNESSES.md)**: what is measured, and how to add your own.
 - **[API reference](reference/index.md)**: every public call, generated from the code.
 

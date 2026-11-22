@@ -56,6 +56,11 @@ machine's API, which has the same names and parameters. SDK modules never import
 process. `tests/test_parity.py` maps every route to the library call that covers it (`@covers`), so a feature can't
 reach the dashboard without reaching Python too.
 
+The JavaScript client in `js/` (the `llmdyno` npm package) makes the same calls over HTTP. Its table of operations,
+`js/src/generated.ts`, is generated from the same route table `RemoteBackend` uses (`scripts/gen_js_client.py`), and
+`tests/test_js_client.py` fails when it falls behind. `npx llmdyno` (`js/src/cli.ts`) starts the Python app through an
+installed copy, uv or pipx.
+
 ### Remote access
 
 Requests from the server's own machine need nothing. Every other request, including one forwarded by a reverse proxy

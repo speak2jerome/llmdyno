@@ -75,6 +75,53 @@ jobs:
           python -m build
           python -m twine check dist/*
 
+  javascript:
+    name: JavaScript client on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: js/package-lock.json
+      - name: Install LLMDyno
+        run: python -m pip install -e .
+      - name: Generated operations are current
+        run: python scripts/gen_js_client.py --check
+      - name: Install, type check, build
+        working-directory: js
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+      - name: Unit tests
+        working-directory: js
+        env:
+          LLMDYNO_TEST_PYTHON: python
+        run: npm test
+      - name: Against a live server with the bundled sample data
+        run: |
+          LLMDYNO_DATA="$RUNNER_TEMP/llmdyno-data" llmdyno serve --port 8799 > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8799/api/health > /dev/null && break; sleep 1; done
+          cd js && LLMDYNO_TEST_URL=http://127.0.0.1:8799 npm run test:live || (cat "$RUNNER_TEMP/server.log"; exit 1)
+      - name: The packed package installs, imports and launches
+        run: |
+          cd js && npm pack --silent && cd ..
+          mkdir -p "$RUNNER_TEMP/try" && cd "$RUNNER_TEMP/try"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/js/llmdyno-*.tgz
+          node --input-type=module -e "import { connect, VERSION } from 'llmdyno'; if (typeof connect !== 'function') process.exit(1); console.log('llmdyno', VERSION);"
+          LLMDYNO_LAUNCHER_DRY_RUN=1 LLMDYNO_PYTHON=python npx --no-install llmdyno doctor
+
   frontend:
     name: Web UI
     runs-on: ubuntu-latest

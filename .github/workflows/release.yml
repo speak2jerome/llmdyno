@@ -64,3 +64,35 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # npm, so `npm install llmdyno` and `npx llmdyno` work. Off until the repository variable PUBLISH_NPM is "true".
+  # After the first manual publish (docs/RELEASING.md), npmjs.com > llmdyno > Settings > Trusted publishing links this
+  # workflow (owner speak2jerome, repository llmdyno, workflow release.yml, environment npm), so no token is stored.
+  npm:
+    needs: release
+    if: vars.PUBLISH_NPM == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - name: Package version matches the tag
+        run: test "v$(node -p "require('./js/package.json').version")" = "$GITHUB_REF_NAME"
+      - name: Build and test
+        working-directory: js
+        run: |
+          npm ci
+          npm run build
+          npm test
+      - name: Publish with provenance
+        working-directory: js
+        run: |
+          TAG=latest
+          case "$GITHUB_REF_NAME" in *-*) TAG=next;; esac
+          npm publish --access public --provenance --tag "$TAG"

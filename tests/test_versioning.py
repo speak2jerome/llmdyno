@@ -29,7 +29,8 @@ def test_changelog_has_this_release():
 
 
 BUMPED = {"INIT": "llmdyno/__init__.py", "PKG": "frontend/package.json", "LOCK": "frontend/package-lock.json",
-          "CHANGELOG": "CHANGELOG.md", "CITATION": "CITATION.cff", "BUG_TEMPLATE": ".github/ISSUE_TEMPLATE/bug_report.yml"}
+          "CHANGELOG": "CHANGELOG.md", "CITATION": "CITATION.cff", "BUG_TEMPLATE": ".github/ISSUE_TEMPLATE/bug_report.yml",
+          "JS_PKG": "js/package.json", "JS_LOCK": "js/package-lock.json", "JS_VERSION": "js/src/version.ts"}
 
 
 def test_bump_script(tmp_path, monkeypatch):
@@ -53,6 +54,10 @@ def test_bump_script(tmp_path, monkeypatch):
     changelog = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{new}] - " in changelog and f"[{new}]: https://github.com/speak2jerome/llmdyno/compare/v{__version__}...v{new}" in changelog
     assert f"version: {new}" in (tmp_path / "CITATION.cff").read_text(encoding="utf-8")
+    js_lock = json.loads((tmp_path / "js/package-lock.json").read_text())
+    assert json.loads((tmp_path / "js/package.json").read_text())["version"] == new
+    assert js_lock["version"] == js_lock["packages"][""]["version"] == new
+    assert f'VERSION = "{new}"' in (tmp_path / "js/src/version.ts").read_text(encoding="utf-8")
 
 
 def test_database_schema_version(tmp_path):

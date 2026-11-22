@@ -38,6 +38,7 @@ nav:
       - Python library and CLI: LIBRARY.md
       - Integrations: INTEGRATIONS.md
       - Remote mode: REMOTE.md
+      - JavaScript and TypeScript: JAVASCRIPT.md
       - Benchmarks: BENCHMARKS.md
       - Harnesses: HARNESSES.md
   - API reference:
@@ -109,6 +110,9 @@ extra:
     REMOTE.md: >-
       Run LLMDyno on the machine with the GPU and drive it from another computer through Python, the command line or a
       browser, protected by an access token.
+    JAVASCRIPT.md: >-
+      Use LLMDyno from JavaScript or TypeScript: npx llmdyno starts it, the llmdyno npm package drives it, and
+      node_harness benchmarks your own Vercel AI SDK, Mastra or LangChain.js agent.
     BENCHMARKS.md: >-
       Write your own LLMDyno benchmark: a coding task with a prompt, starter files, hidden tests and a reference
       solution, graded in an offline Docker container.
@@ -127,7 +131,8 @@ extra:
     reference/profiles.md: API reference for LLMDyno model profiles, local llama.cpp settings, cloud models and VRAM fit.
     reference/models.md: API reference for finding, sizing and downloading GGUF models from Hugging Face with LLMDyno.
     reference/providers.md: API reference for LLMDyno cloud providers, API keys, spend limits, prices and local servers.
-    reference/harnesses.md: API reference for LLMDyno agent harnesses, Docker images and benchmarking your own Python agent.
+    reference/harnesses.md: >-
+      API reference for LLMDyno agent harnesses, Docker images and benchmarking your own Python or TypeScript agent.
     reference/benchmarks.md: API reference for LLMDyno benchmarks and suites, custom tasks, SWE-bench and Aider polyglot.
     reference/plans.md: API reference for LLMDyno plans, the bench() call, progress, retries and budgets.
     reference/runs.md: API reference for LLMDyno runs, transcripts, workspace files, logs and GPU telemetry.

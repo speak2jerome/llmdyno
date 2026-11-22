@@ -9,6 +9,22 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+### Added
+
+- **LLMDyno for JavaScript and TypeScript**, as the `llmdyno` npm package:
+  - `npx llmdyno` starts LLMDyno through an installed copy, uv or pipx, and passes any arguments to the command
+    line.
+  - A typed client with no dependencies, for Node 22+, Bun, Deno and browsers: `connect()`, `bench()`,
+    `cloudModel()`, plans, runs, transcripts, results, typed errors, and live events with `for await (… of
+    watch(plan))`.
+  - Every one of the web API's 116 operations is typed under `dyno.api`. The list is generated from the server's
+    routes by `scripts/gen_js_client.py`, and a test keeps it current.
+- **Benchmark your own TypeScript agent:** `node_harness("agent.ts:run")` (and `llmdyno node-harness`) runs it on
+  Node 24 in the sandbox. Templates are in `examples/agents/ts` for the Vercel AI SDK, Mastra, LangGraph.js and the
+  OpenAI Agents SDK.
+- **CI and releases:** a CI job tests the client on Node 22 and 24, including against a live server, and the
+  Release workflow can publish it to npm with provenance (see docs/RELEASING.md).
+
 ### Changed
 
 - The documentation site is live at https://speak2jerome.github.io/llmdyno/. The README and the package's

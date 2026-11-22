@@ -20,7 +20,8 @@ through llama.cpp on your own GPU, or APIs such as OpenAI, Anthropic, Gemini, De
 harness (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent), and LLMDyno runs real multi-file coding
 tasks in offline Docker sandboxes. Hidden tests grade the result, LLM judges review the code blind, and a dashboard
 compares correctness, code quality, speed, VRAM and cost.
-You can drive it from the web dashboard, from Python (`pip install llmdyno`) or from the command line.
+You can drive it from the web dashboard, from Python (`pip install llmdyno`), from the command line, or from
+JavaScript and TypeScript (`npx llmdyno`, `npm install llmdyno`).
 
 Besides its own tasks it runs **SWE-bench** (Verified, Lite or the 50-task Verified mini, graded by the official
 harness) and the **Aider polyglot** benchmark, and shows **Artificial Analysis** reference numbers next to your own
@@ -35,7 +36,7 @@ a leaderboard says it does on someone else's.
 
 - [Why LLMDyno](#why-llmdyno)
 - [Features](#features)
-- [Quick start](#quick-start) · [Use it from Python](#use-it-from-python)
+- [Quick start](#quick-start) · [Use it from Python](#use-it-from-python) · [Use it from JavaScript](#use-it-from-javascript-and-typescript)
 - [Round 1 results: 15 configurations on an RTX 5080](#round-1-results-15-configurations-on-an-rtx-5080)
 - [Public benchmarks: SWE-bench, Aider polyglot, Artificial Analysis](#public-benchmarks-swe-bench-aider-polyglot-artificial-analysis)
 - [How it works](#how-it-works)
@@ -204,6 +205,24 @@ The [documentation site](https://speak2jerome.github.io/llmdyno/) has the guides
 - [API reference](https://speak2jerome.github.io/llmdyno/reference/)
 
 Runnable examples and notebooks are in [examples/](https://github.com/speak2jerome/llmdyno/tree/main/examples).
+
+## Use it from JavaScript and TypeScript
+
+`npx llmdyno` starts LLMDyno. It uses an installed copy, or runs it through uv or pipx. The `llmdyno` npm package
+is a typed client with the same calls as the Python library:
+
+```ts
+import { connect } from "llmdyno";
+
+const dyno = await connect();                     // http://127.0.0.1:8777, or another machine with a token
+const results = await dyno.bench("Qwen3.8 27B Q3_K_XL 32k", { benchmarks: "suite_quick", harnesses: "pi" });
+console.table(results.leaderboard());
+```
+
+Your own TypeScript agent can be benchmarked too. Templates for the Vercel AI SDK, Mastra, LangGraph.js and the
+OpenAI Agents SDK are in
+[examples/agents/ts](https://github.com/speak2jerome/llmdyno/tree/main/examples/agents/ts). See the
+[JavaScript and TypeScript guide](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/).
 
 ## Round 1 results: 15 configurations on an RTX 5080
 

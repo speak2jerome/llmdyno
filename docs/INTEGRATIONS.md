@@ -18,7 +18,7 @@ Nothing is imported until you use it. If an extra is missing, the error names th
 | `litellm`, `hub` | models behind LiteLLM, publishing results to Hugging Face |
 | `inspect` | Inspect AI tasks, datasets and logs |
 
-Benchmarking your own Python agent (`python_harness`) and the pytest plugin need no extra.
+Benchmarking your own Python or TypeScript agent (`python_harness`, `node_harness`) and the pytest plugin need no extra.
 
 ## Data frames
 
@@ -135,6 +135,11 @@ was checked end to end against a scripted model:
 | OpenAI Agents SDK | `openai_agents_agent.py` |
 | smolagents | `smolagents_agent.py` |
 | PydanticAI | `pydantic_ai_agent.py` |
+
+A TypeScript agent works the same way with `node_harness("agent.ts:run")`. Templates for the Vercel AI SDK, Mastra,
+LangGraph.js and the OpenAI Agents SDK are in
+[examples/agents/ts](https://github.com/speak2jerome/llmdyno/tree/main/examples/agents/ts). See
+[JavaScript and TypeScript](JAVASCRIPT.md#benchmark-your-own-typescript-agent).
 
 ## Inspect AI
 

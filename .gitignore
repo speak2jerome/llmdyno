@@ -16,6 +16,10 @@ build/
 frontend/node_modules/
 frontend/dist/
 
+# JavaScript client (js/dist is covered by dist/ above)
+js/node_modules/
+js/*.tgz
+
 # OS / editor
 .DS_Store
 Thumbs.db

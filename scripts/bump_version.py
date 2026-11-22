@@ -5,7 +5,8 @@
     python scripts/bump_version.py 0.3.0-rc.1   # an explicit version
 
 The single source of truth is llmdyno/__init__.py (pyproject reads it through hatch). This script also updates
-frontend/package.json, package-lock.json, CITATION.cff and the bug-report template, and turns the CHANGELOG's "Unreleased" section into the new release.
+frontend/package.json, package-lock.json, the JavaScript client (js/package.json, its lock file and src/version.ts),
+CITATION.cff and the bug-report template, and turns the CHANGELOG's "Unreleased" section into the new release.
 It does not commit or tag; it prints the commands to do that.
 """
 import datetime
@@ -21,6 +22,9 @@ LOCK = ROOT / "frontend" / "package-lock.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
 CITATION = ROOT / "CITATION.cff"
 BUG_TEMPLATE = ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
+JS_PKG = ROOT / "js" / "package.json"
+JS_LOCK = ROOT / "js" / "package-lock.json"
+JS_VERSION = ROOT / "js" / "src" / "version.ts"
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?$")
 REPO = "https://github.com/speak2jerome/llmdyno"
 
@@ -75,6 +79,13 @@ def main():
         d.get("packages", {}).get("", {})["version"] = new
     if LOCK.exists():
         write_json(LOCK, lock)
+    if JS_PKG.exists():
+        write_json(JS_PKG, lambda d: d.__setitem__("version", new))
+    if JS_LOCK.exists():
+        write_json(JS_LOCK, lock)
+    if JS_VERSION.exists():
+        JS_VERSION.write_text(re.sub(r'VERSION = "[^"]+"', f'VERSION = "{new}"', JS_VERSION.read_text(encoding="utf-8")),
+                              encoding="utf-8")
     roll_changelog(old, new)
     if CITATION.exists():
         text = re.sub(r"^version: .*$", f"version: {new}", CITATION.read_text(encoding="utf-8"), count=1, flags=re.M)
