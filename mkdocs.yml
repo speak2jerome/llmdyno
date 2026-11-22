@@ -1,10 +1,13 @@
 site_name: LLMDyno
-site_description: Benchmark local and cloud LLMs as coding agents, from a web dashboard, a Python library or the command line.
+site_description: Benchmark local and cloud LLMs as coding agents, from a web dashboard, Python, TypeScript or the command line.
+site_author: Jerome Eliezer
 site_url: https://speak2jerome.github.io/llmdyno/
 repo_url: https://github.com/speak2jerome/llmdyno
 repo_name: speak2jerome/llmdyno
 edit_uri: edit/main/docs/
-copyright: MIT License
+copyright: >-
+  MIT License · <a href="https://zynxtech.in/projects/llmdyno/">LLMDyno</a> is part of
+  <a href="https://zynxtech.in/">Zynxtech open source</a>, by <a href="https://zynxtech.in/about/">Jerome Eliezer</a>
 exclude_docs: |
   overrides/
 
@@ -95,6 +98,19 @@ markdown_extensions:
 
 extra:
   home_title: "LLMDyno: benchmark local and cloud LLMs as coding agents"
+  social:
+    - icon: fontawesome/solid/globe
+      link: https://zynxtech.in/projects/llmdyno/
+      name: LLMDyno at Zynxtech
+    - icon: fontawesome/brands/github
+      link: https://github.com/speak2jerome/llmdyno
+      name: Source on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/llmdyno/
+      name: Python package on PyPI
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/llmdyno
+      name: npm package
   # Search engine ownership checks. Paste the content value of the meta tag that Google Search Console or Bing
   # Webmaster Tools gives you; empty means no tag.
   google_site_verification: "voiK2NTjkdsh3st85sjbaF-VugDd_sH2VOiPqiO6G7s"

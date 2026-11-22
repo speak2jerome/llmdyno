@@ -2,6 +2,8 @@
 
 > LLMDyno is an open-source (MIT) benchmark for running local and cloud LLMs as coding agents. Local models run as GGUF files through llama.cpp on your own GPU; cloud models go through OpenAI, Anthropic, Gemini, DeepSeek, Kimi, Qwen, LiteLLM or any OpenAI-compatible server. Agent harnesses (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent, or your own Python or TypeScript agent) work on multi-file coding tasks in offline Docker sandboxes. Hidden tests, static analysis, behaviour probes and blind LLM judges score the result, alongside speed, VRAM and cost. It is a web dashboard, a Python library (`pip install llmdyno`, `import llmdyno`) and a command line (`llmdyno`), all working on the same data, plus a TypeScript client on npm (`npm install llmdyno`, `npx llmdyno`).
 
+LLMDyno is part of Zynxtech open source (https://zynxtech.in/), built by Jerome Eliezer. Project page: https://zynxtech.in/projects/llmdyno/
+
 Key facts:
 
 - Install: `pip install llmdyno`, then `llmdyno serve --open` for the dashboard. Python 3.11 to 3.13 on Windows, Linux and macOS (x86-64, ARM64, Apple Silicon). Docker is needed to run benchmarks.
@@ -51,3 +53,4 @@ Key facts:
 - [Package on PyPI](https://pypi.org/project/llmdyno/)
 - [Package on npm](https://www.npmjs.com/package/llmdyno)
 - [Changelog](https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md)
+- [Project page at Zynxtech](https://zynxtech.in/projects/llmdyno/)

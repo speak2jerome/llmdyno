@@ -86,5 +86,6 @@ for each framework are in
 - [Documentation](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/)
 - [Source and issues](https://github.com/speak2jerome/llmdyno)
 - [Python package](https://pypi.org/project/llmdyno/)
+- [Project page at Zynxtech](https://zynxtech.in/projects/llmdyno/)
 
-MIT licensed.
+MIT licensed. LLMDyno is part of [Zynxtech open source](https://zynxtech.in/), built by [Jerome Eliezer](https://zynxtech.in/about/).

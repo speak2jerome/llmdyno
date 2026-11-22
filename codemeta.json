@@ -1,0 +1,83 @@
+{
+  "@context": "https://w3id.org/codemeta/3.0",
+  "@type": "SoftwareSourceCode",
+  "name": "LLMDyno",
+  "description": "LLMDyno is an open-source benchmark for running local and cloud LLMs as coding agents. It runs agent harnesses on multi-file coding tasks in offline Docker sandboxes, grades them with hidden tests, static analysis and blind LLM judges, and compares correctness, code quality, speed, VRAM and cost. It is a web dashboard, a Python library, a command line and a TypeScript client.",
+  "version": "0.6.2",
+  "dateCreated": "2026-10-25",
+  "datePublished": "2026-10-26",
+  "dateModified": "2026-11-22",
+  "license": "https://spdx.org/licenses/MIT",
+  "url": "https://zynxtech.in/projects/llmdyno/",
+  "codeRepository": "https://github.com/speak2jerome/llmdyno",
+  "issueTracker": "https://github.com/speak2jerome/llmdyno/issues",
+  "readme": "https://github.com/speak2jerome/llmdyno#readme",
+  "softwareHelp": "https://speak2jerome.github.io/llmdyno/",
+  "downloadUrl": "https://pypi.org/project/llmdyno/",
+  "programmingLanguage": [
+    "Python",
+    "TypeScript"
+  ],
+  "runtimePlatform": [
+    "Python 3.11+",
+    "Node.js 22+",
+    "Docker"
+  ],
+  "operatingSystem": [
+    "Windows",
+    "Linux",
+    "macOS"
+  ],
+  "applicationCategory": "Benchmarking",
+  "developmentStatus": "active",
+  "keywords": [
+    "LLM benchmark",
+    "coding agents",
+    "AI agents",
+    "LLM evaluation",
+    "llama.cpp",
+    "GGUF",
+    "local LLM",
+    "VRAM",
+    "LLM-as-a-judge",
+    "SWE-bench",
+    "Aider polyglot",
+    "Python",
+    "TypeScript"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "@id": "https://zynxtech.in/#author",
+      "givenName": "Jerome",
+      "familyName": "Eliezer",
+      "email": "jeromeeliezer@zynxtech.in",
+      "url": "https://zynxtech.in/about/",
+      "affiliation": {
+        "@type": "Organization",
+        "@id": "https://zynxtech.in/#organization",
+        "name": "Zynxtech",
+        "url": "https://zynxtech.in/"
+      }
+    }
+  ],
+  "maintainer": {
+    "@type": "Person",
+    "@id": "https://zynxtech.in/#author",
+    "givenName": "Jerome",
+    "familyName": "Eliezer",
+    "email": "jeromeeliezer@zynxtech.in"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "@id": "https://zynxtech.in/#organization",
+    "name": "Zynxtech",
+    "url": "https://zynxtech.in/"
+  },
+  "sameAs": [
+    "https://zynxtech.in/projects/llmdyno/",
+    "https://speak2jerome.github.io/llmdyno/",
+    "https://pypi.org/project/llmdyno/",
+    "https://www.npmjs.com/package/llmdyno"
+  ]
+}

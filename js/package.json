@@ -1,6 +1,6 @@
 {
   "name": "llmdyno",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Benchmark local and cloud LLMs as coding agents from JavaScript or TypeScript: a typed client for the LLMDyno server, and npx llmdyno to start it.",
   "keywords": [
     "llm",
@@ -15,9 +15,19 @@
     "mastra",
     "langchain",
     "openai-agents",
-    "typescript"
+    "typescript",
+    "ai-agents",
+    "llm-benchmarks",
+    "coding-agents",
+    "agent-evaluation",
+    "gguf",
+    "ollama",
+    "litellm",
+    "python",
+    "dashboard",
+    "zynxtech"
   ],
-  "homepage": "https://speak2jerome.github.io/llmdyno/JAVASCRIPT/",
+  "homepage": "https://zynxtech.in/projects/llmdyno/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/speak2jerome/llmdyno.git",
@@ -25,7 +35,11 @@
   },
   "bugs": "https://github.com/speak2jerome/llmdyno/issues",
   "license": "MIT",
-  "author": "speak2jerome",
+  "author": {
+    "name": "Jerome Eliezer",
+    "email": "jeromeeliezer@zynxtech.in",
+    "url": "https://zynxtech.in/about/"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"

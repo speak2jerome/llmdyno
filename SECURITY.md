@@ -7,7 +7,7 @@ Only the latest 0.x release gets security fixes.
 ## Reporting a vulnerability
 
 Please don't open a public issue. Use GitHub's private vulnerability reporting
-(**Security → Report a vulnerability** on the repository), or email speak2jerome@gmail.com with "LLMDyno security"
+(**Security → Report a vulnerability** on the repository), or email jeromeeliezer@zynxtech.in with "LLMDyno security"
 in the subject. You should hear back within a week.
 
 ## Security model, briefly

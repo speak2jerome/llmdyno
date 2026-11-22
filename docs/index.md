@@ -41,3 +41,6 @@ results.plot.leaderboard()
 - **[API reference](reference/index.md)**: every public call, generated from the code.
 
 Source, issues and releases: [github.com/speak2jerome/llmdyno](https://github.com/speak2jerome/llmdyno).
+
+LLMDyno is part of [Zynxtech open source](https://zynxtech.in/), built by [Jerome Eliezer](https://zynxtech.in/about/). Project page:
+[zynxtech.in/projects/llmdyno](https://zynxtech.in/projects/llmdyno/).

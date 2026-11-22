@@ -5,18 +5,20 @@ build-backend = "hatchling.build"
 [project]
 name = "llmdyno"
 dynamic = ["version"]
-description = "Benchmark local and cloud LLMs as coding agents, from a web dashboard, a Python library or the command line: VRAM fit checks, sandboxed harnesses, hidden tests and LLM judges."
+description = "Benchmark local and cloud LLMs as coding agents, from a web dashboard, Python, TypeScript or the command line: VRAM fit checks, sandboxed harnesses, hidden tests and LLM judges."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE.md"]
 requires-python = ">=3.11"
-authors = [{ name = "speak2jerome", email = "speak2jerome@gmail.com" }]
+authors = [{ name = "Jerome Eliezer", email = "jeromeeliezer@zynxtech.in" }]
+maintainers = [{ name = "Zynxtech", email = "jeromeeliezer@zynxtech.in" }]
 keywords = [
   "llm", "benchmark", "coding-agent", "llama.cpp", "gguf", "local-llm", "vram", "llm-as-a-judge", "evaluation",
   "openai", "anthropic", "claude", "gemini", "qwen", "gemma", "deepseek", "opencode", "codex", "aider", "swe-agent",
   "swe-bench", "aider-polyglot", "artificial-analysis", "apple-silicon", "arm64", "metal", "python-library", "sdk",
   "cli", "llm-evaluation", "agent-benchmark", "mlflow", "wandb", "langfuse", "opentelemetry", "litellm", "ollama",
-  "langgraph", "pytest", "inspect-ai", "huggingface", "jupyter",
+  "langgraph", "pytest", "inspect-ai", "huggingface", "jupyter", "typescript", "ai-agents", "llm-benchmark",
+  "zynxtech",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -52,10 +54,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/speak2jerome/llmdyno"
+Homepage = "https://zynxtech.in/projects/llmdyno/"
 Documentation = "https://speak2jerome.github.io/llmdyno/"
+Source = "https://github.com/speak2jerome/llmdyno"
 Changelog = "https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md"
 Issues = "https://github.com/speak2jerome/llmdyno/issues"
+"npm package" = "https://www.npmjs.com/package/llmdyno"
+Zynxtech = "https://zynxtech.in/"
 
 [project.optional-dependencies]
 dev = ["pytest==8.3.4", "ruff==0.8.4"]

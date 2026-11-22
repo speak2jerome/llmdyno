@@ -31,6 +31,9 @@ measurements. It works on Windows, Linux and macOS, on x86-64, ARM64 and Apple S
 It's a dyno for models: it measures what a model actually does on your machine, with your settings, rather than what
 a leaderboard says it does on someone else's.
 
+LLMDyno is part of [Zynxtech open source](https://zynxtech.in/), built by [Jerome Eliezer](https://zynxtech.in/about/).
+Project page: [zynxtech.in/projects/llmdyno](https://zynxtech.in/projects/llmdyno/) · Docs: [speak2jerome.github.io/llmdyno](https://speak2jerome.github.io/llmdyno/).
+
 <p align="center"><img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/results.png" alt="LLMDyno results dashboard: leaderboard with vendor logos, per-benchmark heatmap and radar chart" width="100%"></p>
 
 ## Contents
@@ -43,7 +46,7 @@ a leaderboard says it does on someone else's.
 - [How it works](#how-it-works)
 - [Supported harnesses, providers and hardware](#supported-harnesses-providers-and-hardware)
 - [FAQ](#faq)
-- [Contributing](#contributing) · [Releases and versioning](#releases-and-versioning) · [License](#license)
+- [Contributing](#contributing) · [Releases and versioning](#releases-and-versioning) · [Author](#author) · [License](#license)
 
 ## Why LLMDyno
 
@@ -412,6 +415,11 @@ LLMDyno follows [Semantic Versioning](https://semver.org). It is in the 0.x seri
 data layout or database schema (with automatic migrations), and patch releases only fix bugs. Every run records the
 LLMDyno version that produced it, and exports carry it in the file name. See [CHANGELOG.md](https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md) and
 [docs/RELEASING.md](https://github.com/speak2jerome/llmdyno/blob/main/docs/RELEASING.md).
+
+## Author
+
+LLMDyno is made by [Jerome Eliezer](https://zynxtech.in/about/) and published as part of [Zynxtech](https://zynxtech.in/), which makes open-source
+tools for AI coding agents and more. Contact: [jeromeeliezer@zynxtech.in](mailto:jeromeeliezer@zynxtech.in).
 
 ## License
 

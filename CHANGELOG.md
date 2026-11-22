@@ -9,6 +9,17 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-22
+
+### Changed
+
+- LLMDyno is part of [Zynxtech open source](https://zynxtech.in/), by Jerome Eliezer. The package metadata on PyPI and
+  npm, `CITATION.cff`, the license and the contact addresses now say so. The project page,
+  https://zynxtech.in/projects/llmdyno/, is the homepage on PyPI, npm and GitHub.
+- New `codemeta.json` with the project's metadata in a machine-readable form; the version script keeps it current.
+- The docs site's structured data names the author and publisher, using the same IDs as zynxtech.in. Its footer links to
+  the project page, GitHub, PyPI and npm.
+
 ## [0.6.1] - 2026-11-22
 
 ### Fixed
@@ -246,7 +257,8 @@ First public release.
   title follow it.
 - Bundled sample results: 15 configurations × 5 tasks on an RTX 5080, judged by two models.
 
-[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/speak2jerome/llmdyno/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/speak2jerome/llmdyno/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/speak2jerome/llmdyno/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/speak2jerome/llmdyno/compare/v0.3.1...v0.5.0

@@ -30,6 +30,7 @@
   <meta name="twitter:title" content="{{ share_title }}">
   <meta name="twitter:description" content="{{ share_desc }}">
   <meta name="twitter:image" content="{{ share_image }}">
+  <link rel="author" href="https://zynxtech.in/about/">
   {% if config.extra.google_site_verification %}
     <meta name="google-site-verification" content="{{ config.extra.google_site_verification }}">
   {% endif %}
@@ -50,10 +51,15 @@
         "license": "https://opensource.org/licenses/MIT",
         "downloadUrl": "https://pypi.org/project/llmdyno/",
         "codeRepository": {{ config.repo_url | tojson }},
-        "programmingLanguage": "Python",
+        "programmingLanguage": ["Python", "TypeScript"],
         "image": {{ share_image | tojson }},
+        "author": {"@type": "Person", "@id": "https://zynxtech.in/#author", "name": "Jerome Eliezer",
+                   "url": "https://zynxtech.in/about/#author",
+                   "worksFor": {"@id": "https://zynxtech.in/#organization"}},
+        "publisher": {"@type": "Organization", "@id": "https://zynxtech.in/#organization", "name": "Zynxtech",
+                      "url": "https://zynxtech.in/", "logo": "https://zynxtech.in/icon-512.png"},
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
-        "sameAs": [{{ config.repo_url | tojson }}, "https://pypi.org/project/llmdyno/"]
+        "sameAs": [{{ config.repo_url | tojson }}, "https://zynxtech.in/projects/llmdyno/", "https://pypi.org/project/llmdyno/", "https://www.npmjs.com/package/llmdyno"]
       }
     </script>
   {% endif %}

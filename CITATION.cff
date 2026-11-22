@@ -7,12 +7,16 @@ abstract: >-
   results dashboard comparing correctness, code quality, speed, memory and cost.
 type: software
 authors:
-  - alias: speak2jerome
-    email: speak2jerome@gmail.com
+  - given-names: Jerome
+    family-names: Eliezer
+    alias: speak2jerome
+    email: jeromeeliezer@zynxtech.in
+    affiliation: Zynxtech
+    website: "https://zynxtech.in/about/"
 repository-code: "https://github.com/speak2jerome/llmdyno"
-url: "https://github.com/speak2jerome/llmdyno"
+url: "https://zynxtech.in/projects/llmdyno/"
 license: MIT
-version: 0.6.1
+version: 0.6.2
 date-released: "2026-11-22"
 keywords:
   - large language models
@@ -23,3 +27,6 @@ keywords:
   - local LLM
   - LLM-as-a-judge
   - VRAM
+  - TypeScript
+  - SWE-bench
+  - AI agents
