@@ -1,6 +1,6 @@
 {
   "name": "llmdyno",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Benchmark local and cloud LLMs as coding agents from JavaScript or TypeScript: a typed client for the LLMDyno server, and npx llmdyno to start it.",
   "keywords": [
     "llm",
