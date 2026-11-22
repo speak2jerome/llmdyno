@@ -20,6 +20,7 @@ through llama.cpp on your own GPU, or APIs such as OpenAI, Anthropic, Gemini, De
 harness (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent), and LLMDyno runs real multi-file coding
 tasks in offline Docker sandboxes. Hidden tests grade the result, LLM judges review the code blind, and a dashboard
 compares correctness, code quality, speed, VRAM and cost.
+You can drive it from the web dashboard, from Python (`pip install llmdyno`) or from the command line.
 
 Besides its own tasks it runs **SWE-bench** (Verified, Lite or the 50-task Verified mini, graded by the official
 harness) and the **Aider polyglot** benchmark, and shows **Artificial Analysis** reference numbers next to your own

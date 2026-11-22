@@ -13,6 +13,8 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 - The documentation site is live at https://speak2jerome.github.io/llmdyno/. The README and the package's
   Documentation link now point to it.
+- The docs site has share previews, page descriptions, structured data and an `llms.txt` for AI assistants, and the
+  package summary and keywords mention the Python library and its integrations.
 
 ## [0.5.0] - 2026-11-22
 

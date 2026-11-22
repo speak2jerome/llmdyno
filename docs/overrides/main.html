@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{#- Search and share metadata. Page descriptions come from extra.page_descriptions in mkdocs.yml (applied by
+    scripts/mkdocs_seo.py), so the Markdown files stay free of front matter and read cleanly on GitHub. -#}
+
+{% block htmltitle %}
+  {% if page and page.is_homepage %}
+    <title>{{ config.extra.home_title }}</title>
+  {% else %}
+    {{ super() }}
+  {% endif %}
+{% endblock %}
+
+{% block extrahead %}
+  {#- The 404 page has no page object; it gets no share tags. -#}
+  {% if page %}
+  {% set share_title = config.extra.home_title if page.is_homepage else (page.title | striptags) ~ " - " ~ config.site_name %}
+  {% set share_desc = page.meta.description or config.site_description %}
+  {% set share_image = config.site_url ~ "images/social-preview.png" %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ share_title }}">
+  <meta property="og:description" content="{{ share_desc }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  <meta property="og:image" content="{{ share_image }}">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="LLMDyno: a pixel-art dinosaur with a rocket on its back, running on a treadmill">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ share_title }}">
+  <meta name="twitter:description" content="{{ share_desc }}">
+  <meta name="twitter:image" content="{{ share_image }}">
+  {% if config.extra.google_site_verification %}
+    <meta name="google-site-verification" content="{{ config.extra.google_site_verification }}">
+  {% endif %}
+  {% if config.extra.bing_site_verification %}
+    <meta name="msvalidate.01" content="{{ config.extra.bing_site_verification }}">
+  {% endif %}
+  {% if page.is_homepage %}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "LLMDyno",
+        "description": {{ config.site_description | tojson }},
+        "url": {{ config.site_url | tojson }},
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Windows, Linux, macOS",
+        "softwareVersion": {{ config.extra.version | tojson }},
+        "license": "https://opensource.org/licenses/MIT",
+        "downloadUrl": "https://pypi.org/project/llmdyno/",
+        "codeRepository": {{ config.repo_url | tojson }},
+        "programmingLanguage": "Python",
+        "image": {{ share_image | tojson }},
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "sameAs": [{{ config.repo_url | tojson }}, "https://pypi.org/project/llmdyno/"]
+      }
+    </script>
+  {% endif %}
+  {% endif %}
+{% endblock %}

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "llmdyno"
 dynamic = ["version"]
-description = "Benchmark local and cloud LLMs as coding agents: VRAM fit checks, sandboxed harnesses, hidden tests, LLM judges and a results dashboard."
+description = "Benchmark local and cloud LLMs as coding agents, from a web dashboard, a Python library or the command line: VRAM fit checks, sandboxed harnesses, hidden tests and LLM judges."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE.md"]
@@ -14,11 +14,16 @@ authors = [{ name = "speak2jerome", email = "speak2jerome@gmail.com" }]
 keywords = [
   "llm", "benchmark", "coding-agent", "llama.cpp", "gguf", "local-llm", "vram", "llm-as-a-judge", "evaluation",
   "openai", "anthropic", "claude", "gemini", "qwen", "gemma", "deepseek", "opencode", "codex", "aider", "swe-agent",
-  "swe-bench", "aider-polyglot", "artificial-analysis", "apple-silicon", "arm64", "metal",
+  "swe-bench", "aider-polyglot", "artificial-analysis", "apple-silicon", "arm64", "metal", "python-library", "sdk",
+  "cli", "llm-evaluation", "agent-benchmark", "mlflow", "wandb", "langfuse", "opentelemetry", "litellm", "ollama",
+  "langgraph", "pytest", "inspect-ai", "huggingface", "jupyter",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
+  "Environment :: Console",
   "Environment :: Web Environment",
+  "Framework :: Jupyter",
+  "Framework :: Pytest",
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
@@ -30,7 +35,9 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Testing",
+  "Topic :: System :: Benchmark",
   "Typing :: Typed",
 ]
 

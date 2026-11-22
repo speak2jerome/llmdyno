@@ -1,13 +1,16 @@
 site_name: LLMDyno
-site_description: Benchmark local and cloud LLMs as coding agents, from a dashboard or Python.
+site_description: Benchmark local and cloud LLMs as coding agents, from a web dashboard, a Python library or the command line.
 site_url: https://speak2jerome.github.io/llmdyno/
 repo_url: https://github.com/speak2jerome/llmdyno
 repo_name: speak2jerome/llmdyno
 edit_uri: edit/main/docs/
 copyright: MIT License
+exclude_docs: |
+  overrides/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   logo: images/logo.svg
   favicon: images/logo.svg
   palette:
@@ -58,6 +61,9 @@ nav:
       - Architecture: ARCHITECTURE.md
       - Releasing: RELEASING.md
 
+hooks:
+  - scripts/mkdocs_seo.py
+
 plugins:
   - search
   - mkdocstrings:
@@ -85,3 +91,50 @@ markdown_extensions:
   - pymdownx.highlight
   - pymdownx.superfences
   - pymdownx.inlinehilite
+
+extra:
+  home_title: "LLMDyno: benchmark local and cloud LLMs as coding agents"
+  # Search engine ownership checks. Paste the content value of the meta tag that Google Search Console or Bing
+  # Webmaster Tools gives you; empty means no tag.
+  google_site_verification: ""
+  bing_site_verification: ""
+  # Meta descriptions, keyed by the file's path inside docs/. The home page uses site_description.
+  page_descriptions:
+    LIBRARY.md: >-
+      Use LLMDyno from Python or the command line: describe models, run coding-agent benchmarks, read transcripts and
+      compare results. Install with pip install llmdyno.
+    INTEGRATIONS.md: >-
+      Use LLMDyno with pandas, Jupyter, plotly, MLflow, Weights & Biases, Langfuse, OpenTelemetry, LiteLLM, Ollama, the
+      Hugging Face Hub, Inspect AI, pytest and your own agent.
+    REMOTE.md: >-
+      Run LLMDyno on the machine with the GPU and drive it from another computer through Python, the command line or a
+      browser, protected by an access token.
+    BENCHMARKS.md: >-
+      Write your own LLMDyno benchmark: a coding task with a prompt, starter files, hidden tests and a reference
+      solution, graded in an offline Docker container.
+    HARNESSES.md: >-
+      Add an agent harness to LLMDyno, from the UI without code or as a Python adapter, and the rules every harness
+      follows inside the offline sandbox.
+    ARCHITECTURE.md: >-
+      How LLMDyno is built: the run pipeline, VRAM projection, the data model, scoring, the Python SDK, the web API and
+      remote access.
+    RELEASING.md: >-
+      How LLMDyno releases are made: version bump, CI on every platform, tag, GitHub release, PyPI upload and the docs
+      site.
+    reference/index.md: >-
+      API reference for the llmdyno Python package, generated from the code. Every call is also a llmdyno command.
+    reference/system.md: API reference for LLMDyno setup, system checks, GPU status, cleanup and background jobs.
+    reference/profiles.md: API reference for LLMDyno model profiles, local llama.cpp settings, cloud models and VRAM fit.
+    reference/models.md: API reference for finding, sizing and downloading GGUF models from Hugging Face with LLMDyno.
+    reference/providers.md: API reference for LLMDyno cloud providers, API keys, spend limits, prices and local servers.
+    reference/harnesses.md: API reference for LLMDyno agent harnesses, Docker images and benchmarking your own Python agent.
+    reference/benchmarks.md: API reference for LLMDyno benchmarks and suites, custom tasks, SWE-bench and Aider polyglot.
+    reference/plans.md: API reference for LLMDyno plans, the bench() call, progress, retries and budgets.
+    reference/runs.md: API reference for LLMDyno runs, transcripts, workspace files, logs and GPU telemetry.
+    reference/results.md: API reference for LLMDyno results, scores, exports, charts and tracking integrations.
+    reference/judging.md: API reference for LLMDyno code review by LLM judges, rubrics and judge agreement.
+    reference/live.md: API reference for LLMDyno live events, watch() and the async API.
+    reference/remote.md: API reference for connecting the llmdyno library to a server on another machine.
+    reference/settings.md: API reference for LLMDyno settings, tokens and Artificial Analysis reference numbers.
+    reference/interop.md: API reference for LLMDyno interop with Inspect AI, pytest and CI regression checks.
+    reference/errors.md: API reference for the errors the llmdyno library raises and what each one means.
