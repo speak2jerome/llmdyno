@@ -49,7 +49,7 @@ views as text), raising `llmdyno.errors` with the HTTP status each error means. 
 turn HTTP into service calls and back, and one exception handler in `server.py` maps errors to `{"detail": …}`.
 
 The library in `llmdyno/sdk/` calls services by name, `call("runs.run_transcript", rid=...)`, through a backend:
-`LocalBackend` runs them in-process, and a remote backend (planned for 0.6) will send the same call to another
+`LocalBackend` runs them in-process, and `RemoteBackend` (from `llmdyno.connect()`) sends the same call to another
 machine's API, which has the same names and parameters. SDK modules never import the database or engine modules
 (a test enforces it), so every object works the same either way. Live events reach the library through
 `events.add_listener`, which works without the web server; `watch()` falls back to polling for work in another

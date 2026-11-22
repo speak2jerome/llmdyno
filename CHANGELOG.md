@@ -9,6 +9,10 @@ than modified. Patch releases (0.1.1) only fix bugs.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-22
+
+There is no 0.4.0. Full library parity, the integrations and remote mode ship together in this release.
+
 ### Added
 
 - **The library can do everything the dashboard does.** Every web API route has a library call (116 of them), and a
@@ -202,7 +206,8 @@ First public release.
   title follow it.
 - Bundled sample results: 15 configurations × 5 tasks on an RTX 5080, judged by two models.
 
-[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/speak2jerome/llmdyno/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/speak2jerome/llmdyno/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/speak2jerome/llmdyno/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/speak2jerome/llmdyno/compare/v0.1.0...v0.2.0
