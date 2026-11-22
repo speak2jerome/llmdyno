@@ -96,7 +96,7 @@ extra:
   home_title: "LLMDyno: benchmark local and cloud LLMs as coding agents"
   # Search engine ownership checks. Paste the content value of the meta tag that Google Search Console or Bing
   # Webmaster Tools gives you; empty means no tag.
-  google_site_verification: ""
+  google_site_verification: "voiK2NTjkdsh3st85sjbaF-VugDd_sH2VOiPqiO6G7s"
   bing_site_verification: ""
   # Meta descriptions, keyed by the file's path inside docs/. The home page uses site_description.
   page_descriptions:
