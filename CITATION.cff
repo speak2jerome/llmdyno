@@ -16,7 +16,7 @@ authors:
 repository-code: "https://github.com/speak2jerome/llmdyno"
 url: "https://zynxtech.in/projects/llmdyno/"
 license: MIT
-version: 0.6.2
+version: 0.6.3
 date-released: "2026-11-22"
 keywords:
   - large language models

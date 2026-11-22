@@ -15,19 +15,22 @@ __all__ = ["Provider", "list_providers", "provider", "add_provider", "vendors", 
 
 
 class Provider(Handle):
-    """A cloud provider account: vendor, endpoint, API key (kept encrypted in the data folder, never returned),
+    """A cloud provider account: vendor, endpoint, API key (kept in the data folder's secret store, never returned),
     a hard budget and what has been spent against it."""
 
     @property
     def name(self) -> str:
+        """The provider's display name."""
         return self._data["name"]
 
     @property
     def vendor(self) -> str:
+        """The vendor id: openai, anthropic, google, …, litellm or custom."""
         return self._data["vendor"]
 
     @property
     def budget_usd(self) -> float:
+        """The provider's hard spend cap in dollars: the proxy refuses requests beyond it."""
         return self._data["budget_usd"]
 
     @property
@@ -37,9 +40,11 @@ class Provider(Handle):
 
     @property
     def has_key(self) -> bool:
+        """Whether an API key is saved for it."""
         return bool(self._data.get("has_key"))
 
     def refresh(self) -> "Provider":
+        """Read the provider again, with its spend so far."""
         hit = [p for p in call("providers.list_providers") if p["id"] == self.id]
         if not hit:
             raise NotFoundError(f"no provider {self.id}")
@@ -72,11 +77,13 @@ class Provider(Handle):
 
     @covers("PUT /api/providers/{pid}/key")
     def set_key(self, api_key: str) -> "Provider":
+        """Save a new API key for this provider. It replaces the old one and is never shown again."""
         self._d = call("providers.set_provider_key", pid=self.id, body={"api_key": api_key})
         return self
 
     @covers("DELETE /api/providers/{pid}/key")
     def remove_key(self) -> "Provider":
+        """Delete the provider's saved API key."""
         self._d = call("providers.del_provider_key", pid=self.id)
         return self
 

@@ -51,7 +51,7 @@ _lock = threading.Lock()
 
 
 def set_data_dir(path):
-    """Point LLMDyno at another data folder. The library calls this (llmdyno.open) before re-opening the database;
+    """Point LLMDyno at another data folder. The library calls this (llmdyno.init()) before re-opening the database;
     folders saved in that folder's settings.json still win over these defaults."""
     global DATA
     DATA = Path(path).expanduser().resolve()

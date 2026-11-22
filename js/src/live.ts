@@ -32,7 +32,7 @@ export interface WatchOptions {
   gpu?: boolean;
   /** Stop after this many milliseconds. */
   timeoutMs?: number;
-  /** How often to poll as well, in milliseconds (default 2000); polling covers anything the socket misses. */
+  /** How often to poll as well, in milliseconds (default 2000); polling catches status changes the socket missed. */
   pollMs?: number;
   /** Stop when this signal aborts. */
   signal?: AbortSignal;
@@ -124,8 +124,9 @@ function openSocket(client: Client, onMessage: (msg: Json) => void, topics: stri
  *       if (ev.kind === "run" && ev.finished) console.log(ev.data.benchmark_id, ev.status, ev.data.correctness);
  *     }
  *
- * Events come live over the server's WebSocket; the state is also polled every pollMs so nothing is missed when the
- * socket is unavailable (a proxy that blocks WebSockets, say).
+ * Events come live over the server's WebSocket. The state is also polled every pollMs, so status changes of the
+ * plan, its runs or the job still arrive when the socket is unavailable (a proxy that blocks WebSockets, say);
+ * transcript, proxy, GPU and log events need the socket.
  */
 export async function* watch(client: Client, target: WatchTarget, options: WatchOptions = {}): AsyncGenerator<LiveEvent> {
   const [kind, tid] = targetOf(target);

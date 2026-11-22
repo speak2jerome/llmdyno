@@ -7,7 +7,7 @@
 The single source of truth is llmdyno/__init__.py (pyproject reads it through hatch). This script also updates
 frontend/package.json, package-lock.json, the JavaScript client (js/package.json, its lock file and src/version.ts),
 CITATION.cff, codemeta.json and the bug-report template, and turns the CHANGELOG's "Unreleased" section into the new release.
-It does not commit or tag; it prints the commands to do that.
+It does not commit or tag; it prints the commands to do that (docs/RELEASING.md has the whole route).
 """
 import datetime
 import json
@@ -99,7 +99,7 @@ def main():
         BUG_TEMPLATE.write_text(BUG_TEMPLATE.read_text(encoding="utf-8").replace(f'placeholder: "{old}"',
                                                                                  f'placeholder: "{new}"'),
                                 encoding="utf-8")
-    print(f"{old} -> {new}\n\nNext:\n  cd frontend && npm run build && cd ..\n  git commit -am \"Release v{new}\"\n"
+    print(f"{old} -> {new}\n\nNext:\n  cd frontend && npm run build && cd ..\n  git add -A && git commit -m \"Release v{new}\"\n"
           f"  git tag -a v{new} -m \"LLMDyno {new}\"\n  git push && git push --tags")
 
 

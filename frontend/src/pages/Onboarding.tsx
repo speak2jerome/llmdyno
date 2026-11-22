@@ -95,7 +95,7 @@ export default function Onboarding({ onClose }: { onClose: () => void }) {
             </div>
             {specs.isLoading ? <Skeleton h={140} /> : <SystemCards specs={specs.data} />}
             {specs.data && <NoteList notes={specs.data.summary.notes} />}
-            {!archOk && <Notice tone="danger" title="Unsupported architecture">LLMDyno currently supports x86-64 (Windows and Linux). ARM support is planned.</Notice>}
+            {!archOk && <Notice tone="danger" title="Unsupported architecture">LLMDyno supports x86-64 and ARM64 (Apple Silicon included) on Windows, Linux and macOS.</Notice>}
             <div className="row">
               <Button icon={<ArrowLeft size={15} />} onClick={() => setStep(0)}>Back</Button>
               <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => setStep(2)} disabled={!archOk}>Check dependencies</Button>

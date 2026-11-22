@@ -7,7 +7,7 @@ you start from a script shows up in the dashboard, and profiles you made in the 
 ```python
 import llmdyno
 
-gpt = llmdyno.cloud_model("openai", "gpt-6-luna", reasoning_effort="low", budget_usd=2)
+gpt = llmdyno.cloud_model("openai", "gpt-6-luna", reasoning_effort="low", budget_usd=2)   # $2 cap for OpenAI
 qwen = llmdyno.local_model("unsloth/Qwen3.8-27B-GGUF", quant="UD-Q3_K_XL", ctx=49152)
 
 results = llmdyno.bench([gpt, qwen], benchmarks="suite_quick", harnesses="pi")
@@ -39,6 +39,10 @@ The cost of a local run is the GPU's electricity at your rate (Settings); cloud 
 pip install llmdyno                      # add [pandas] for Results.to_pandas(): pip install "llmdyno[pandas]"
 ```
 
+Other extras add charts, notebooks, experiment tracking and more: see [Integrations](INTEGRATIONS.md#install). The
+core dependencies (FastAPI, SQLAlchemy, pydantic, …) are pinned to exact versions, so install LLMDyno in its own
+virtual environment rather than into a busy notebook environment.
+
 Requirements are the same as for the app: Python 3.11+, Docker running (agents work in sandboxes), and for local models
 a GPU that llama.cpp supports. `import llmdyno` itself is instant and starts nothing; the first call opens the data
 folder.
@@ -54,6 +58,9 @@ llmdyno.setup(harnesses=["pi", "opencode"])   # sandbox + harness images, llama.
 
 `setup()` only does what is missing. It downloads several gigabytes the first time (Docker images, a llama.cpp build).
 Add `swebench=True` for the official SWE-bench harness and `polyglot=True` for the Aider polyglot toolchain image.
+`llama_cpp=True` picks the best llama.cpp build for this machine; pass a variant such as `"cuda-13"`, `"metal"`,
+`"vulkan"` or `"cpu"` to choose one, or `False` for cloud-only use. Docker must be running: on Windows and macOS
+`llmdyno.start_docker()` starts Docker Desktop, and `install_docker()` downloads and runs its installer.
 
 ## Models
 
@@ -69,16 +76,24 @@ ollama = llmdyno.cloud_model("custom", "qwen3-coder:30b", base_url="http://host.
 ```
 
 - **Vendors**: openai, anthropic, google, deepseek, moonshot, zai, qwen, minimax, xai, mistral, openrouter, groq,
-  together, fireworks, cerebras, or `custom` for any OpenAI-compatible URL (Ollama, LM Studio, vLLM, a gateway).
+  together, fireworks, cerebras, `litellm` for a LiteLLM proxy, or `custom` for any OpenAI-compatible URL (Ollama,
+  LM Studio, vLLM, a gateway). See [Integrations](INTEGRATIONS.md#model-gateways-and-servers) for helpers.
 - **Keys**: `api_key=`, or the usual environment variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
-  `DEEPSEEK_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`, …), or a key you saved in the app. Keys are stored encrypted
-  in the data folder and only ever reach LLMDyno's per-run proxy, never an agent sandbox.
-- **Spend**: `budget_usd` is a hard cap for that provider (new providers default to $5). `bench(budget_usd=…)` adds a
-  cap for one plan. The proxy refuses requests once a cap is reached.
+  `DEEPSEEK_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY`, …; the full list is in
+  [Configuration](CONFIGURATION.md#environment-variables)), or a key you saved in the app. A key you pass or that is
+  in the environment replaces the saved one. Keys are saved in the data folder (encrypted with DPAPI on Windows, in a
+  file only your user can read on Linux and macOS) and only ever reach LLMDyno's per-run proxy, never an agent
+  sandbox.
+- **Spend**: `budget_usd` is the provider's hard cap, shared by every model of that provider (new providers start
+  at $5); passing it again changes the cap. Spend accumulates across plans until you call
+  `provider.reset_spend()`. `bench(budget_usd=…)` adds a cap for one plan. The proxy refuses requests once a cap is
+  reached, and judging and quick tests count too.
 - **Prices**: `pricing="auto"` (the default) looks the model up in OpenRouter's public catalog; pass
   `{"input": 3.0, "output": 15.0, "cached": 0.3}` (USD per million tokens) to set them yourself.
 - **Settings**: `ctx`, `max_output_tokens`, `reasoning_effort` (minimal, low, medium, high, max), `temperature`, `top_p`,
-  `api_style` (openai-chat, openai-responses, anthropic), `extra_body`.
+  `extra_body`.
+- **Provider options**: `base_url` (required for `custom`) and `api_style` (openai-chat, openai-responses,
+  anthropic, when the vendor offers several) belong to the provider, so they apply to every profile that uses it.
 
 ### Local (llama.cpp)
 
@@ -96,8 +111,9 @@ qwen.update(ctx=32768)   # change a setting
 
 Settings: `ctx`, `cache_k` / `cache_v` (or `kv_cache` for both), `gpu_layers`, `n_cpu_moe`, `flash_attn`, `thinking`,
 `max_output_tokens`, `reasoning_budget`, sampling (`temperature`, `top_p`, `top_k`, `min_p`, …) and the rest of
-the profile editor's fields. Unknown names raise `TypeError` rather than being ignored. `local_model()` warns when the
-profile is projected not to fit in VRAM.
+the profile editor's fields. Unknown names raise `TypeError` rather than being ignored. `local_model()` prints a
+`warning:` line when the profile is projected not to fit in VRAM (`quiet=True` hides it). A new profile is named
+after the model file and the context, such as `Qwen3.8-27B-UD-Q3_K_XL · 48k`; pass `name=` to choose.
 
 ### Existing profiles
 
@@ -115,7 +131,7 @@ llmdyno.profile_defaults("local", model="Qwen3.8-27B-UD-Q3_K_XL")   # what a new
 ### Finding and downloading models
 
 ```python
-llmdyno.search_models("qwen coder")                 # Hugging Face GGUF repositories
+llmdyno.search_models("qwen coder")                 # Hugging Face GGUF repositories (sort=, limit=)
 info = llmdyno.repo_info("unsloth/Qwen3.8-27B-GGUF")   # quants, sizes, a fit hint for your GPU, license, gated
 fit = llmdyno.estimate("unsloth/Qwen3.8-27B-GGUF", "UD-Q3_K_XL", ctx=65536, kv_cache="q8_0")
 fit["check"]["verdict"], fit["contexts"]            # will it fit, before downloading (reads the GGUF header)
@@ -126,7 +142,8 @@ llmdyno.list_models(status="ready")
 m = llmdyno.model("Qwen3.8-27B-UD-Q3_K_XL")          # by id, name or "repo:quant"
 m.contexts()                                        # memory at each context size on this machine
 m.profile(ctx=32768)                                # a profile from it
-m.pause(); m.resume(); m.delete(files=True)
+m.pause(); m.resume(wait=False)                     # resume() waits for the download unless wait=False
+m.delete(files=True)                                # files=True also deletes the GGUF from disk
 llmdyno.import_models("D:/models")                  # register every GGUF in a folder, no copy
 ```
 
@@ -136,7 +153,7 @@ llmdyno.import_models("D:/models")                  # register every GGUF in a f
 
 ```python
 p = llmdyno.provider("anthropic")                   # by id, name, or vendor when you have one of it
-p.test()                                            # checks the key and lists models: {"ok", "models", "latency_ms"}
+p.test()                                            # checks the key: {"ok", "error", "models", "latency_ms"}
 p.models()
 p.spent_usd, p.budget_usd
 p.update(budget_usd=10); p.reset_spend()
@@ -209,7 +226,9 @@ While it runs it prints each run as it finishes. Ctrl+C cancels the plan cleanly
 plan = llmdyno.bench([gpt, qwen], "suite_round1", wait=False)
 plan.status            # queued, running, paused, done, …
 plan.runs()            # every run with its status and scores
-plan.pause(); plan.resume(); plan.cancel()
+plan.pause()           # runs in progress finish, queued ones wait
+plan.resume(wait=False)   # resume() waits for the plan unless wait=False
+plan.cancel()          # running agents stop; finished results are kept
 results = plan.wait()
 plan.open()            # the live plan page in the dashboard
 plan.retry()           # run the failed and cancelled runs again
@@ -244,12 +263,14 @@ for ev in llmdyno.watch(plan):
     if ev.kind == "run" and ev.finished:
         print(ev.data["benchmark_id"], ev.status, ev.data["correctness"])
     elif ev.kind == "gpu":
-        print("VRAM", ev.data.get("vram_used_mib"))
+        print("VRAM", ev.data.get("vram_mib"), "MiB,", ev.data.get("util_pct"), "% busy")
 ```
 
-Event kinds: `run` (a run changed state), `plan`, `gpu` (telemetry samples while a local model runs), `job` and
-`log` (background jobs such as downloads), and with `watch(plan, transcript=True)` also `transcript` (each agent
-event) and `proxy` (each model request with tokens, cost and latency). Or pass a callback to the blocking calls:
+Event kinds: `run` (a run changed state), `plan`, `gpu` (telemetry samples while a local model runs: `vram_mib`,
+`vram_total_mib`, `util_pct`, `power_w`, `temp_c`, `shared_mib`), `job` and `log` (background jobs such as
+downloads), and with `watch(plan, transcript=True)` also `transcript` (each agent event) and `proxy` (each model
+request with tokens, cost and latency). Each `Event` has `kind`, `topic`, `data`, `ts`, `status`, `run_id` and
+`finished`. Or pass a callback to the blocking calls:
 `llmdyno.bench(..., on_event=print)`.
 
 Events arrive live for work started in the same Python process. Work running elsewhere, such as a plan started from
@@ -272,12 +293,13 @@ results = await aio.call(plan.results)      # any blocking method, in a thread
 
 ```python
 print(results)                  # leaderboard, plus SWE-bench / polyglot rates when there are such runs
+# results.data is the raw response; the methods below are its tables
 results.leaderboard()           # one dict per profile × harness, best first (scores 0-100)
 results.runs()                  # one dict per run
 results.public()                # SWE-bench resolved % and polyglot solved % per configuration
 results.best()
 
-results.to_pandas()             # DataFrame (pip install pandas); to_pandas("runs") for every run
+results.to_pandas()             # DataFrame (pip install "llmdyno[pandas]"); to_pandas("runs") for every run
 results.to_csv("leaderboard.csv")
 results.to_json("results.json")
 results.open()                  # the full dashboard: charts, transcripts, workspaces
@@ -324,7 +346,7 @@ llmdyno.delete_reviews(judge, plan=plan)
 
 ```python
 llmdyno.set_aa_key("...")        # free key from artificialanalysis.ai
-llmdyno.refresh_aa()             # cached for a day; the free tier allows 100 requests a day
+llmdyno.refresh_aa()             # refreshed at most every 12 hours; the free tier allows 100 requests a day
 llmdyno.aa_reference()           # matches per profile and the model list
 llmdyno.set_aa_match(qwen, "qwen3-8-27b")   # pick the match by hand (None: back to automatic)
 ```
@@ -347,7 +369,8 @@ llmdyno.start_docker(); llmdyno.repair_docker(); llmdyno.use_llama_cpp("D:/llama
 ## Command line
 
 Every call above is also a command, generated from the library so the two always match. Function names become
-commands with dashes, methods become `llmdyno <object> <method> ID`, and `--json` gives machine-readable output:
+commands with dashes, methods become `llmdyno <object> <method> ID`, and `--json` gives machine-readable output.
+The [command line reference](reference/cli.md) lists every command with its arguments and defaults.
 
 ```bash
 llmdyno list-models --status ready
@@ -360,9 +383,19 @@ llmdyno plan retry PLAN_ID
 llmdyno --help; llmdyno run --help; llmdyno bench --help
 ```
 
-`llmdyno` alone starts the web app, as before. Errors print to stderr and exit with code 1. Two commands have no
-Python twin: `llmdyno ci` (fail a build on a score drop, see [INTEGRATIONS.md](INTEGRATIONS.md#ci-and-pytest)) and
-`llmdyno token` (the access token for remote clients, see [REMOTE.md](REMOTE.md)).
+`llmdyno` alone starts the web app, like `llmdyno serve` without opening a browser. Errors print to stderr; the exit
+code is 1 for an LLMDyno error, 2 for a usage error (an unknown option, a bad `--set`) and 130 after Ctrl+C.
+`llmdyno ci` exits 1 when scores dropped and 2 when it can't compare.
+
+Some things differ between the two:
+
+- **Only on the command line**: `llmdyno ci` (fail a build on a score drop, see
+  [INTEGRATIONS.md](INTEGRATIONS.md#ci-and-pytest)), `llmdyno token` (the access token for remote clients, see
+  [REMOTE.md](REMOTE.md)) and `llmdyno serve --host` (`llmdyno.serve()` always listens on 127.0.0.1).
+- **Only in Python**: `init()`, `connect()`, `disconnect()` and `connection()` (use `--data`, `--url` and
+  `--api-token` instead), `inspect_task()` and `import_inspect_samples()` (they take and return Inspect objects),
+  `Settings.update()`, and the methods of `Results` and `Transcript` other than the views `--view` and `--export`
+  give (`to_pandas()`, `plot`, `log_to_mlflow()`, `push_to_hub()`, …).
 
 ## Integrations and remote mode
 
@@ -390,7 +423,7 @@ llmdyno.data_dir()
 ```
 
 Running plans from a script and from the app at the same time on one machine is not supported: both would try to load
-models onto the same GPU.
+models onto the same GPU. [Configuration](CONFIGURATION.md) describes what is in the folder and every setting.
 
 ## Errors
 
@@ -399,12 +432,12 @@ with, so an error means the same thing from Python and over REST.
 
 | Exception | When | HTTP |
 |---|---|---|
-| `llmdyno.PreflightError` | a plan cannot start; `.problems` lists why, `.report` has the full preflight | 409 |
+| `llmdyno.PreflightError` | a plan cannot start; `.problems` lists why, `.warnings` the rest, `.report` has the full preflight. `bench()` also raises it for danger warnings without `acknowledge_risks=True` | 409 |
 | `llmdyno.NotFoundError` | no such profile, benchmark, plan, run, file or quant | 404 |
 | `llmdyno.ConflictError` | a name or file is ambiguous, already in use, or in the wrong state | 409 |
 | `llmdyno.InvalidError` | a request that cannot be valid as given (also a `ValueError`) | 400 |
 | `llmdyno.ForbiddenError` | not allowed, such as editing a built-in benchmark | 403 |
-| `llmdyno.RiskNotAcknowledgedError` | danger warnings need `acknowledge_risks=True` | 428 |
+| `llmdyno.RiskNotAcknowledgedError` | the web API's answer when a plan with danger warnings is created without `acknowledge_risks` | 428 |
 | `llmdyno.RateLimitError`, `UpstreamError` | an external service limited or failed the request | 429, 502 |
 | `llmdyno.InsufficientStorageError` | not enough disk space, for example for a download | 507 |
 | `llmdyno.LLMDynoError` | anything else LLMDyno refuses or fails to do (all of the above inherit from it) | 400 |
@@ -418,7 +451,7 @@ with, so an error means the same thing from Python and over REST.
 | `doctor()`, `setup(...)` | `Doctor` (list of checks with `.ok`, `.missing`) |
 | `cloud_model(vendor, model, ...)`, `local_model(repo, quant=..., ...)`, `profile(name)`, `list_profiles()`, `import_profile(path)` | `Profile` |
 | `profile_defaults(kind, model=)` | dict |
-| `search_models(q)`, `repo_info(repo)`, `estimate(repo, quant, ...)`, `recommended_models()` | lists and dicts |
+| `search_models(query)`, `repo_info(repo)`, `estimate(repo, quant, ...)`, `recommended_models()` | lists and dicts |
 | `download_model(repo, quant)`, `model(name)`, `list_models()`, `import_models(folder)` | `Model` |
 | `provider(name)`, `list_providers()`, `add_provider(vendor, ...)` | `Provider` |
 | `vendors()`, `lookup_price(vendor, model)` | lists and dicts |
@@ -426,19 +459,22 @@ with, so an error means the same thing from Python and over REST.
 | `list_benchmarks()`, `list_suites()`, `import_catalog()` | lists and dicts |
 | `benchmark(id)`, `create_benchmark(spec)`, `import_benchmark(zip)` | `Benchmark` |
 | `suite(id)`, `create_suite(name, benchmarks)` | `Suite` |
-| `import_swebench()`, `import_polyglot()`, `install_swebench_harness()`, `build_polyglot_image()`, `remove_imported(kind)` | job results |
+| `import_swebench()`, `import_polyglot()`, `install_swebench_harness()`, `build_polyglot_image()` | job results (dicts) |
+| `remove_imported(kind)` | how many benchmarks were removed |
 | `preflight(models, benchmarks, harnesses)` | dict |
 | `bench(models, benchmarks, harnesses, ...)` | `Results` (or `Plan` with `wait=False`) |
 | `list_plans()`, `plan(id)` | `Plan` |
 | `run(id)`, `plan.get_runs()` | `Run`; `run.transcript()` gives a `Transcript` |
-| `results(plans, weights, benchmarks=, ...)`, `review(plans, judges, ...)` | `Results` |
+| `results(plans, correctness=, quality=, ..., benchmarks=, pass_threshold=)`, `review(plans, judges, ...)` | `Results` |
 | `judge_defaults()`, `reviews(plan=, run=)`, `delete_reviews(judge)` | dicts, lists, counts |
-| `save_weights(...)`, `load_sample()`, `unload_sample()`, `sample_status()` | dicts |
+| `save_weights(...)`, `sample_status()` | dicts |
+| `load_sample()`, `unload_sample()` | the sample plan's id, nothing |
 | `aa_reference()`, `refresh_aa()`, `set_aa_key()`, `remove_aa_key()`, `set_aa_match(profile, slug)` | dicts |
 | `settings()` | `Settings` (`.update(...)`); `set_hf_token()`, `remove_hf_token()` |
 | `specs()`, `gpu_usage()`, `active_work()`, `panic()`, `cleanup()` | dicts, counts |
 | `list_jobs()`, `job(id)`, `clear_jobs()` | `Job` (`.status`, `.progress`, `.log`, `.wait()`, `.cancel()`) |
-| `start_docker()`, `repair_docker()`, `install_docker()`, `use_llama_cpp(path)` | messages |
+| `start_docker()`, `repair_docker()` | a message |
+| `install_docker()`, `use_llama_cpp(path)` | dicts |
 | `watch(plan or run or job, transcript=False)` | iterator of `Event` |
 | `python_harness("module:function", requirements=[...])` | `Harness` |
 | `node_harness("agent.ts:run", packages=[...])` | `Harness` |
@@ -450,8 +486,10 @@ with, so an error means the same thing from Python and over REST.
 | `serve()` | dashboard URL |
 | `llmdyno.aio.<any function>`, `aio.watch()`, `aio.call(fn, ...)` | the same, awaitable |
 
-Every object (`Profile`, `Plan`, `Job`, …) gives its raw data with `obj["field"]`, `obj.get("field")` and
-`obj.to_dict()`, and `obj.refresh()` fetches it again.
+The objects that stand for something stored (`Profile`, `Model`, `Provider`, `Harness`, `Benchmark`, `Suite`,
+`Plan`, `Run`, `Job`) give their raw data with `obj["field"]`, `obj.get("field")` and `obj.to_dict()`, and
+`obj.refresh()` fetches it again. `Settings` works the same way. `Results` keeps the raw response in `.data`, and
+`Transcript`, `Doctor` and `Event` are plain views of what they hold.
 
 ## API stability
 

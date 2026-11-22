@@ -16,7 +16,9 @@ def review(plans: Any=None, judges: Union[Profile, str, Sequence[Any]] = (), *, 
            include_static: bool = False, max_output_tokens: int | None = None, skip_reviewed: bool = True,
            wait: bool = True, quiet: bool = False) -> Union[Results, Job]:
     """Blind LLM code review of finished runs by one or more judge profiles (cloud or local), then fresh Results
-    whose code-quality score includes the reviews. Review whole plans, or only some runs with runs=.
+    whose code-quality score includes the reviews. judges is required: a profile, its name, or a list (two from
+    different vendors let LLMDyno check agreement and self-preference). Review whole plans, or only some runs
+    with runs=.
     budget_usd caps the judges' spend. rubric and guidance replace the defaults (see judge_defaults(): a rubric is a
     list of {"key", "label", "description"} dimensions); include_static shows judges the static-analysis findings;
     skip_reviewed=False reviews again runs a judge already reviewed. wait=False returns the Job."""

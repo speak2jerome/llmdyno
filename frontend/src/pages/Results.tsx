@@ -276,7 +276,7 @@ export default function Results() {
         <Card title="Per-benchmark heatmap" sub="Click a cell to list its runs." actions={<Select value={heatMetric} onChange={setHeatMetric} options={METRICS.filter((m) => m.level.includes("cell")).map((m) => ({ value: m.key, label: m.label }))} aria-label="Heatmap metric" />}>
           <Heatmap configs={configs} cells={cells} benchIds={benchIds} labels={L} name={cname} logo={clogo} metricKey={heatMetric} onClick={(k: string) => setRunFilter(k)} />
         </Card>
-        <Card title="Profile shape" sub="Up to 5 configurations across six normalised dimensions.">
+        <Card title="Profile shape" sub="Up to 5 configurations across their normalised scores (and cheapness, when costs differ).">
           <div className="pill-list mb-12">{configs.slice(0, 14).map((c: any) => <Chip key={ckey(c)} on={radarSel.includes(ckey(c))} onClick={() => setRadarSel((x) => x.includes(ckey(c)) ? x.filter((y) => y !== ckey(c)) : x.length >= 5 ? x : [...x, ckey(c)])}><LogoName id={clogo(c)} size={14}>{cname(c).slice(0, 30)}</LogoName></Chip>)}</div>
           <Radar configs={configs.filter((c: any) => radarSel.includes(ckey(c)))} all={configs} name={cname} logo={clogo} />
         </Card>

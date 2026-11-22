@@ -7,8 +7,8 @@
         assert llmdyno_results.best()["correctness"] == 100
 
 The marker runs the plan once per distinct set of arguments in a session (tests sharing them share the run). A test
-fails when the best final score is under min_score or the best correctness under min_correctness, so a marked test
-needs no body at all. Other marker keywords go to llmdyno.bench(). Fixtures: `llmdyno` (the library, on
+fails when the top configuration (best final score) scores under min_score, or its correctness is under
+min_correctness, so a marked test needs no body at all. Other marker keywords go to llmdyno.bench(). Fixtures: `llmdyno` (the library, on
 --llmdyno-data if given) and `llmdyno_results`. Options: --llmdyno-data DIR, --llmdyno-skip (skip marked tests, e.g. on
 machines without Docker or a GPU). Nothing here imports more than pytest until a marked test runs."""
 from __future__ import annotations

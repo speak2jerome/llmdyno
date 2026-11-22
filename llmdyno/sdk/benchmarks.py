@@ -88,10 +88,12 @@ class Benchmark(Handle):
 
     @property
     def title(self) -> str:
+        """The benchmark's title."""
         return self._data["title"]
 
     @property
     def builtin(self) -> bool:
+        """True for the benchmarks that ship with LLMDyno, which can't be edited or deleted."""
         return bool(self._data.get("builtin"))
 
     @property
@@ -101,6 +103,7 @@ class Benchmark(Handle):
 
     @covers("GET /api/benchmarks/{bid}")
     def refresh(self) -> "Benchmark":
+        """Read the benchmark again."""
         return super().refresh()
 
     @covers("GET /api/benchmarks/{bid}/spec")
@@ -121,6 +124,7 @@ class Benchmark(Handle):
 
     @covers("DELETE /api/benchmarks/{bid}")
     def delete(self) -> None:
+        """Delete a benchmark you made or imported. Results of past runs are kept."""
         call("benchmarks.delete_benchmark", bid=self.id)
 
     @covers("GET /api/benchmarks/{bid}/export")
@@ -169,13 +173,16 @@ class Suite(Handle):
 
     @property
     def name(self) -> str:
+        """The suite's name."""
         return self._data["name"]
 
     @property
     def benchmark_ids(self) -> list[Any]:
+        """The ids of the benchmarks in the suite."""
         return list(self._data.get("benchmark_ids") or [])
 
     def refresh(self) -> "Suite":
+        """Read the suite again."""
         hit = [x for x in call("benchmarks.list_suites") if x["id"] == self.id]
         if not hit:
             raise NotFoundError(f"no suite {self.id}")
@@ -194,6 +201,7 @@ class Suite(Handle):
 
     @covers("DELETE /api/suites/{sid}")
     def delete(self) -> None:
+        """Delete a suite you made. The benchmarks in it are kept."""
         call("benchmarks.delete_suite", sid=self.id)
 
     def __repr__(self):

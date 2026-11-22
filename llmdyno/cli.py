@@ -42,7 +42,7 @@ TRANSCRIPT_VIEWS = ("turns", "tool-calls", "thinking", "final", "usage", "events
 
 def _first_sentence(obj) -> str:
     text = " ".join((inspect.getdoc(obj) or "").split())
-    m = re.search(r"(?<=[.!?])\s", text)
+    m = re.search(r"(?<!e\.g\.)(?<!i\.e\.)(?<=[.!?])\s", text)
     return text[:m.start()] if m else text
 
 
@@ -58,7 +58,7 @@ def _is_seq(name: str, p) -> bool:
     ann = _ann(p)
     if "Sequence" in ann or ann.startswith("list") or isinstance(p.default, (list, tuple)):
         return True
-    return not ann and name in PLURALS
+    return name in PLURALS and ann in ("", "Any", "typing.Any")
 
 
 def _json_or_text(s: str):
@@ -88,7 +88,10 @@ def _add_params(parser: argparse.ArgumentParser, fn) -> list:
             spec.append((name, "pos"))
             continue
         opt = "--" + _dash(name)
-        if isinstance(p.default, bool):
+        if isinstance(p.default, bool) and "str" in ann:          # True/False or a value: --llama-cpp [VARIANT]
+            parser.add_argument(opt, dest=name, nargs="?", const=True, default=p.default, metavar="VALUE")
+            parser.add_argument("--no-" + _dash(name), dest=name, action="store_const", const=False)
+        elif isinstance(p.default, bool):
             parser.add_argument(opt, dest=name, action=argparse.BooleanOptionalAction, default=p.default)
         elif _is_seq(name, p):
             parser.add_argument(opt, dest=name, nargs="+", default=p.default)
@@ -134,12 +137,20 @@ def build_parser():
     sub = ap.add_subparsers(dest="cmd", metavar="COMMAND")
     registry = {}
 
-    sv = sub.add_parser("serve", parents=[common], help="start the web app (the default)")
-    sv.add_argument("--host", default="127.0.0.1")
-    sv.add_argument("--port", type=int, default=None)
+    sv = sub.add_parser("serve", parents=[common], help="start the web app (the default)",
+                        description="Start the web app and its API. `llmdyno` with no command does the same.")
+    sv.add_argument("--host", default="127.0.0.1",
+                    help="address to listen on; anything but 127.0.0.1 or localhost lets other machines in, "
+                         "and they need the access token (llmdyno token)")
+    sv.add_argument("--port", type=int, default=None, help="port (default: the port setting, 8777)")
     sv.add_argument("--open", action="store_true", help="open the browser")
-    sub.add_parser("doctor", parents=[common], help="check system specs and dependencies")
-    sub.add_parser("specs", parents=[common], help="print detected hardware as JSON")
+    sub.add_parser("doctor", parents=[common], help="check system specs and dependencies",
+                   description="Print notes about this machine (architecture, GPU, memory) and the state of "
+                               "everything benchmarks need: Docker, the sandbox and code-quality images, llama.cpp, "
+                               "the harness images and the SWE-bench harness. `llmdyno setup` installs what is "
+                               "missing.")
+    sub.add_parser("specs", parents=[common], help="print detected hardware as JSON",
+                   description="Print the detected hardware (CPU, RAM, GPUs, driver, disks, Docker) as JSON.")
     tk = sub.add_parser("token", parents=[common], help="the access token remote clients need (made on first use)",
                         description="Print the API token remote clients and browsers must present. It is shown when "
                                     "it is made; --rotate replaces it (the old one stops working at once).")

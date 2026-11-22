@@ -129,3 +129,22 @@ def test_push_and_load_results(monkeypatch, tmp_path):
     finally:
         if not was:
             llmdyno.unload_sample()
+
+
+def test_preflight_counts_what_the_provider_already_spent():
+    """The "exceeds what is left in the budget" warning subtracts the spend ledger, not a database column."""
+    from llmdyno import llm
+    p = llmdyno.cloud_model("groq", "budget-test-model", api_key="gsk-test", budget_usd=1.0,
+                            pricing={"input": 3.0, "output": 15.0, "cached": 0.3})
+    prov = llmdyno.provider(p["provider_id"])
+    try:
+        def left_warning():
+            pf = llmdyno.preflight(p, "t1_flask_site")
+            return [w["text"] for w in pf["warnings"] if "left in the" in w["text"]]
+        assert not left_warning()                                  # the estimate fits in $1
+        llm.ledger_add(prov.id, 0.999)
+        assert any("$0.00 left" in t for t in left_warning())
+    finally:
+        llm.ledger_reset(f"provider_{prov.id}")
+        p.delete()
+        prov.delete()

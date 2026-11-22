@@ -18,6 +18,7 @@ class Harness(Handle):
 
     @property
     def name(self) -> str:
+        """The harness's display name."""
         return self._data["name"]
 
     @property
@@ -27,6 +28,8 @@ class Harness(Handle):
 
     @property
     def builtin(self) -> bool:
+        """True for the harnesses that ship with LLMDyno; False for custom ones (add_harness(), python_harness(),
+        node_harness())."""
         return bool(self._data.get("builtin", True))
 
     @property
@@ -35,6 +38,7 @@ class Harness(Handle):
         return list(self._data.get("apis") or [])
 
     def refresh(self) -> "Harness":
+        """Read the harness again, with its image status."""
         hit = [h for h in call("harnesses.list_harnesses") if h["id"] == self.id]
         if not hit:
             raise NotFoundError(f"no harness {self.id}")

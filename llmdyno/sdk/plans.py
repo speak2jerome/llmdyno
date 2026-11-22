@@ -87,10 +87,12 @@ class Plan(Handle):
 
     @covers("GET /api/plans/{pid}")
     def refresh(self) -> "Plan":
+        """Read the plan again: status, counts and runs."""
         return super().refresh()
 
     @property
     def name(self) -> str:
+        """The plan's name."""
         return self._get()["name"]
 
     @property
@@ -124,12 +126,13 @@ class Plan(Handle):
 
     @covers("PATCH /api/plans/{pid}")
     def rename(self, name: str) -> "Plan":
+        """Give the plan a new name."""
         self._d = call("plans.rename_plan", pid=self.id, body={"name": name})
         return self
 
     @covers("DELETE /api/plans/{pid}")
     def delete(self, files: bool = True) -> None:
-        """Delete the plan, its runs and reviews; files=True also deletes the run folders (workspaces, logs)."""
+        """Delete the plan, its runs and reviews, and (unless files=False) the run folders: workspaces, logs."""
         call("plans.delete_plan", pid=self.id, delete_files=files)
 
     def __repr__(self):
@@ -170,19 +173,24 @@ class Plan(Handle):
         return self.results()
 
     def results(self, **weights: Any) -> "Results":
+        """Scored results of this plan, with the options of results() (weights, pass_threshold, …)."""
         from .results import results
         return results(self, **weights)
 
     @covers("POST /api/plans/{pid}/cancel")
     def cancel(self) -> None:
+        """Stop the plan: running agents stop and those runs are marked cancelled; finished results are kept."""
         call("plans.cancel_plan", pid=self.id)
 
     @covers("POST /api/plans/{pid}/pause")
     def pause(self) -> None:
+        """Pause the plan: runs in progress finish, queued runs wait for resume()."""
         call("plans.pause_plan", pid=self.id)
 
     @covers("POST /api/plans/{pid}/resume")
     def resume(self, wait: bool = True, quiet: bool = False, on_event: Any=None):
+        """Continue a paused, cancelled or failed plan that still has queued runs. Like bench(), it waits for the
+        plan and returns its Results; wait=False returns the Plan at once."""
         call("plans.resume_plan", pid=self.id)
         return self.wait(quiet=quiet, on_event=on_event) if wait else self
 

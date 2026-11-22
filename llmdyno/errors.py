@@ -36,7 +36,8 @@ class ConflictError(LLMDynoError):
 
 
 class RiskNotAcknowledgedError(InvalidError):
-    """A plan has danger warnings (VRAM spill, out of memory, …) that need acknowledge_risks=True."""
+    """A plan has danger warnings (VRAM spill, out of memory, …) that need acknowledge_risks=True. The web API
+    answers 428 with it; bench() checks first and raises PreflightError instead."""
     status = 428
 
 
@@ -56,7 +57,8 @@ class InsufficientStorageError(LLMDynoError):
 
 
 class PreflightError(LLMDynoError):
-    """A plan cannot start. `problems` are the blocking items, `warnings` the rest of the preflight report."""
+    """A plan cannot start. `problems` are the blocking items (or, when bench() refuses unacknowledged danger
+    warnings, those warnings), `warnings` the other warnings, and `report` the whole preflight report."""
     status = 409
 
     def __init__(self, problems: Iterable[str], warnings: Iterable[str] | None = None,

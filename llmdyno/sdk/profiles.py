@@ -37,6 +37,7 @@ class Profile(Handle):
 
     @property
     def name(self) -> str:
+        """The profile's name."""
         return self._data["name"]
 
     @property
@@ -46,6 +47,7 @@ class Profile(Handle):
 
     @property
     def params(self) -> dict[str, Any]:
+        """A copy of its settings: ctx, KV cache, offload, sampling, reasoning, …"""
         return dict(self._data.get("params") or {})
 
     @property
@@ -55,6 +57,7 @@ class Profile(Handle):
 
     @covers("GET /api/profiles/{pid}")
     def refresh(self) -> "Profile":
+        """Read the profile again."""
         return super().refresh()
 
     def __repr__(self):
@@ -93,6 +96,8 @@ class Profile(Handle):
 
     @covers("DELETE /api/profiles/{pid}")
     def delete(self) -> None:
+        """Delete the profile. Results of past runs are kept; the server refuses while runs of it are queued or
+        running."""
         call("profiles.delete_profile", pid=self.id)
 
     @covers("POST /api/profiles/{pid}/duplicate")
@@ -194,12 +199,13 @@ def cloud_model(vendor: str, model: str, *, api_key: str | None = None, name: st
     vendor: openai, anthropic, google, deepseek, moonshot, zai, qwen, minimax, xai, mistral, openrouter, groq, together,
     fireworks, cerebras, litellm (a LiteLLM proxy: see litellm_model()), or custom (any OpenAI-compatible base_url,
     such as Ollama or vLLM: see ollama_model() and openai_compatible()).
-    api_key: stored encrypted in the data folder; when omitted, the saved key or the usual environment variable
-    (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, …) is used. The key only ever reaches LLMDyno's proxy.
-    budget_usd: hard spend cap for this provider (new providers default to $5).
+    api_key: saved in the data folder (DPAPI-encrypted on Windows, a file only you can read elsewhere); when
+    omitted, the usual environment variable (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, …) or else the saved
+    key is used. The key only ever reaches LLMDyno's proxy.
+    budget_usd: hard spend cap of the provider, shared by all its models (new providers default to $5); on an
+    existing provider it changes the cap. base_url and api_style are provider settings too.
     pricing: "auto" looks the model up in OpenRouter's catalog; or {"input": $, "output": $, "cached": $} per 1M tokens.
-    Other keywords are profile settings: ctx, max_output_tokens, reasoning_effort, temperature, top_p, api_style,
-    extra_body."""
+    Other keywords are profile settings: ctx, max_output_tokens, reasoning_effort, temperature, top_p, extra_body."""
     vendors = {v["id"]: v for v in call("providers.list_vendors")}
     v = vendors.get(vendor)
     if not v:

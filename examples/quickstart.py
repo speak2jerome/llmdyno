@@ -1,7 +1,8 @@
 """Compare a cloud model with a local one on the quick suite (3 tasks, about 5 minutes per model locally).
 
-Needs Docker running and OPENAI_API_KEY set. The first run builds the sandbox images and downloads llama.cpp and the
-model (several GB). Cloud spend is capped at $1 for this plan.
+Needs Docker running, OPENAI_API_KEY set, and a GPU with about 16 GB of VRAM for the local model (pick a smaller
+quant or model otherwise). The first run builds the sandbox images and downloads llama.cpp and the model (several GB).
+Cloud spend is capped at $1 for this plan and $2 in total for the OpenAI provider. It opens the dashboard at the end.
 
     python examples/quickstart.py
 """

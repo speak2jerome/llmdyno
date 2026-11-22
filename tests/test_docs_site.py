@@ -40,6 +40,23 @@ def test_every_page_has_a_description():
     assert len(config["site_description"]) <= 200
 
 
+def test_generated_reference_pages_are_current():
+    """docs/reference/cli.md and web-api.md come from the CLI parser and the server's routes."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("gen_reference_docs", ROOT / "scripts" / "gen_reference_docs.py")
+    assert spec and spec.loader
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    for name, text in gen.render_all().items():
+        current = (ROOT / "docs" / "reference" / name).read_text(encoding="utf-8").replace("\r\n", "\n")
+        assert current == text, f"docs/reference/{name} is out of date: run python scripts/gen_reference_docs.py"
+
+
 def test_llms_txt_links_every_page():
     links = re.findall(r"\((" + re.escape(SITE) + r"[^)]*)\)", (ROOT / "docs" / "llms.txt").read_text(encoding="utf-8"))
     assert set(links) == {_site_url(page) for page in _nav_files(_config()["nav"])}
+
+
+def test_root_llms_txt_is_the_docs_one():
+    """The repository's llms.txt is a copy of docs/llms.txt, which the site serves; one stale copy misleads."""
+    assert (ROOT / "llms.txt").read_text(encoding="utf-8") == (ROOT / "docs" / "llms.txt").read_text(encoding="utf-8")

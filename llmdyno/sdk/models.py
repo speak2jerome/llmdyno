@@ -19,14 +19,17 @@ class Model(Handle):
 
     @property
     def name(self) -> str:
+        """The model's name (its file name without .gguf)."""
         return self._data["name"]
 
     @property
     def repo(self) -> str:
+        """The Hugging Face repository it came from (empty for files imported from disk)."""
         return self._data.get("repo") or ""
 
     @property
     def quant(self) -> str:
+        """The quantization, such as "UD-Q3_K_XL"."""
         return self._data.get("quant") or ""
 
     @property
@@ -36,6 +39,7 @@ class Model(Handle):
 
     @property
     def size_gb(self) -> float:
+        """Size on disk in GiB."""
         return round((self._data.get("size_bytes") or 0) / 2**30, 2)
 
     @property
@@ -45,6 +49,7 @@ class Model(Handle):
 
     @covers("GET /api/models/{mid}")
     def refresh(self) -> "Model":
+        """Read the model again, with its download status and progress."""
         return super().refresh()
 
     def contexts(self) -> list[Any]:

@@ -65,10 +65,10 @@ export default function Settings({ onOnboard }: { onOnboard: () => void }) {
           <Card title="Appearance">
             <Segmented value={pref} onChange={setPref} options={[{ value: "light", label: <span className="row" style={{ gap: 6 }}><Sun size={13} />Light</span> }, { value: "dark", label: <span className="row" style={{ gap: 6 }}><Moon size={13} />Dark</span> }, { value: "system", label: <span className="row" style={{ gap: 6 }}><Monitor size={13} />System</span> }]} />
           </Card>
-          <Card title={<span className="row"><KeyRound size={15} /> Hugging Face token</span>} sub="Needed for gated repositories. Stored encrypted like provider keys.">
+          <Card title={<span className="row"><KeyRound size={15} /> Hugging Face token</span>} sub="Needed for gated repositories. Kept with the provider keys in the data folder.">
             <div className="row">
               <Input type="password" autoComplete="off" aria-label="Hugging Face token" value={token} onChange={(e) => setToken(e.target.value)} placeholder={s.hf_token_set ? "A token is saved; paste to replace" : "hf_…"} />
-              <Button disabled={!token.trim()} onClick={async () => { await api.put("/settings/hf-token", { token: token.trim() }).catch((e) => toast.err("Could not save", e)); setToken(""); qc.invalidateQueries({ queryKey: keys.settings }); toast.ok("Token saved"); }}>Save</Button>
+              <Button disabled={!token.trim()} onClick={async () => { try { await api.put("/settings/hf-token", { token: token.trim() }); setToken(""); toast.ok("Token saved"); } catch (e) { toast.err("Could not save", e); } qc.invalidateQueries({ queryKey: keys.settings }); }}>Save</Button>
               {s.hf_token_set && <Button variant="danger" iconOnly icon={<Trash2 size={14} />} aria-label="Remove token" onClick={async () => { await api.del("/settings/hf-token"); qc.invalidateQueries({ queryKey: keys.settings }); toast.ok("Token removed"); }} />}
             </div>
             {s.hf_token_set && <Badge tone="ok" className="mt-12">token saved</Badge>}

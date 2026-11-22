@@ -144,6 +144,7 @@ class Results:
         return out
 
     def best(self) -> dict[str, Any] | None:
+        """The top row of the leaderboard (the best configuration by final score), or None."""
         lb = self.leaderboard()
         return lb[0] if lb else None
 
@@ -224,6 +225,7 @@ class Results:
         return ResultsPlot(self)
 
     def to_csv(self, path: Union[str, Path, None] = None, level: str = "configs") -> str:
+        """The leaderboard, or every run with level="runs", as CSV text; also written to path when given."""
         rows = self.leaderboard() if level == "configs" else self.runs()
         buf = io.StringIO()
         if rows:
@@ -235,6 +237,8 @@ class Results:
         return buf.getvalue()
 
     def to_json(self, path: Union[str, Path, None] = None) -> dict[str, Any]:
+        """Leaderboard, runs, public-benchmark scores and weights in one dict, with the LLMDyno version and plan
+        ids; also written to path when given. llmdyno ci reads this format."""
         from .. import __version__ as v
         out = {"llmdyno_version": v, "plans": self.plan_ids, "leaderboard": self.leaderboard(), "runs": self.runs(),
                "public": self.public(), "weights": self.data.get("weights")}

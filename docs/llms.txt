@@ -6,25 +6,32 @@ LLMDyno is part of Zynxtech open source (https://zynxtech.in/), built by Jerome 
 
 Key facts:
 
-- Install: `pip install llmdyno`, then `llmdyno serve --open` for the dashboard. Python 3.11 to 3.13 on Windows, Linux and macOS (x86-64, ARM64, Apple Silicon). Docker is needed to run benchmarks.
+- Install: `pip install llmdyno`, then `llmdyno serve --open` for the dashboard at http://127.0.0.1:8777. Python 3.11 or later (tested on 3.11 to 3.13) on Windows, Linux and macOS (x86-64, ARM64, Apple Silicon). Docker is needed to run benchmarks. `llmdyno setup` installs the sandbox images, the harness images and a llama.cpp build for the machine.
 - Python: `llmdyno.bench([models], benchmarks=..., harnesses=...)` returns `Results` with `to_pandas()`, `plot`, `export()` and tracking helpers. `llmdyno.cloud_model()` and `llmdyno.local_model()` describe the models.
-- Every dashboard feature has a library call and a `llmdyno <area> <verb>` command; a test enforces it.
-- Before a local model downloads, LLMDyno estimates whether it fits in GPU memory at a given context length and quantization.
-- It also runs SWE-bench (official harness) and the Aider polyglot benchmark, and shows Artificial Analysis reference numbers.
-- Optional extras add pandas/polars, Jupyter, matplotlib/plotly, MLflow, Weights & Biases, Langfuse, OpenTelemetry, LiteLLM, the Hugging Face Hub, Inspect AI and a pytest plugin.
-- Remote mode: `llmdyno serve --host 0.0.0.0` on the GPU machine, `llmdyno.connect(url, token)` from anywhere.
-- JavaScript and TypeScript: `npx llmdyno` starts it; `import { connect } from "llmdyno"` gives the same calls as the Python library, with every web API operation typed under `dyno.api`.
-- Your own agent as a harness: `llmdyno.python_harness("my_agent:run")` for Python (LangGraph, OpenAI Agents SDK, smolagents, PydanticAI) and `llmdyno.node_harness("agent.ts:run")` for TypeScript (Vercel AI SDK, Mastra, LangChain.js, OpenAI Agents SDK).
+- Every library call is also a command (`llmdyno list-models`, `llmdyno bench ...`, `llmdyno run transcript RUN_ID`), and every web API route has a library call; tests enforce both.
+- Before a local model downloads, LLMDyno estimates whether it fits in GPU memory at a given context length and quantization, and warns about out-of-memory, VRAM spilling into system RAM on Windows, CPU offload and short contexts.
+- It also runs SWE-bench (graded by the official harness) and the Aider polyglot benchmark, and shows Artificial Analysis reference numbers next to local measurements.
+- Scores: hidden-test correctness 50%, instruction following 15%, code quality 25% (static analysis, behaviour probes, judge reviews), efficiency 10%; the weights are adjustable.
+- Safety: agents have no internet access; a per-run proxy holds the API key and enforces hard spend caps; a panic stop halts every run, container and model server.
+- Optional extras add pandas/polars/pyarrow, notebook widgets and progress bars, matplotlib/plotly, MLflow, Weights & Biases, Langfuse, OpenTelemetry, LiteLLM prices, the Hugging Face Hub and Inspect AI. A pytest plugin is always installed.
+- Remote mode: `llmdyno serve --host 0.0.0.0` on the GPU machine, then `llmdyno.connect(url, token)`, `--url` on the command line, or the JS client from anywhere.
+- JavaScript and TypeScript: `npx llmdyno` starts it; `import { connect } from "llmdyno"` gives the main calls of the Python library, with every web API operation typed under `dyno.api`.
+- Your own agent as a harness: `llmdyno.python_harness("my_agent:run")` for Python (LangGraph, OpenAI Agents SDK, smolagents, PydanticAI) and `llmdyno.node_harness("agent.ts:run")` for TypeScript (Vercel AI SDK, Mastra, LangGraph.js, OpenAI Agents SDK).
+- Round 1 sample results (RTX 5080 16 GB, five tasks, Pi harness, two judges): GPT-6 Luna API 94.3; Qwen3.8 27B UD-Q3_K_XL 90.9, the best local result, passing every hidden test; Gemma 4 E2B 39.7. They ship with LLMDyno as sample data.
 
 ## Docs
 
 - [Home](https://speak2jerome.github.io/llmdyno/): what LLMDyno is, install, a first benchmark from Python
+- [Getting started](https://speak2jerome.github.io/llmdyno/GETTING_STARTED/): requirements, installing, first-time setup, a first benchmark four ways, upgrading and uninstalling
+- [The dashboard](https://speak2jerome.github.io/llmdyno/DASHBOARD/): every page of the web app: models and memory fit, profiles, providers, harnesses, benchmarks, plans, runs, judging, results, settings
 - [Python library and CLI](https://speak2jerome.github.io/llmdyno/LIBRARY/): models, profiles, plans, runs, results, judging, the command line, API stability
 - [Integrations](https://speak2jerome.github.io/llmdyno/INTEGRATIONS/): data frames, notebooks, charts, experiment tracking, tracing, model gateways, the Hub, your own agent, Inspect AI, pytest and CI
-- [Remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/): run on a GPU machine and drive it from elsewhere with an access token
+- [Remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/): run on a GPU machine and drive it from elsewhere with an access token; HTTPS and reverse proxies
 - [JavaScript and TypeScript](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/): npx llmdyno, the npm client, and benchmarking TypeScript agents
-- [Writing a benchmark](https://speak2jerome.github.io/llmdyno/BENCHMARKS/): prompts, starter files, hidden tests, reference solutions
-- [Adding a harness](https://speak2jerome.github.io/llmdyno/HARNESSES/): custom harnesses from the UI or as Python adapters
+- [Writing a benchmark](https://speak2jerome.github.io/llmdyno/BENCHMARKS/): prompts, starter files, hidden tests, checks, script graders, suites, reference solutions
+- [Adding a harness](https://speak2jerome.github.io/llmdyno/HARNESSES/): the built-in harnesses, custom harness manifests and Python adapters
+- [Configuration](https://speak2jerome.github.io/llmdyno/CONFIGURATION/): the data folder, every setting, environment variables, ports and key storage
+- [Troubleshooting](https://speak2jerome.github.io/llmdyno/TROUBLESHOOTING/): Docker, llama.cpp, VRAM, downloads, budgets, failed runs, remote access
 
 ## API reference
 
@@ -44,13 +51,15 @@ Key facts:
 - [Settings and references](https://speak2jerome.github.io/llmdyno/reference/settings/)
 - [Interop and CI](https://speak2jerome.github.io/llmdyno/reference/interop/)
 - [Errors](https://speak2jerome.github.io/llmdyno/reference/errors/)
+- [Command line](https://speak2jerome.github.io/llmdyno/reference/cli/): every command with its arguments and defaults
+- [Web API map](https://speak2jerome.github.io/llmdyno/reference/web-api/): every route with its Python call, command and JavaScript method
 
 ## Optional
 
-- [Architecture](https://speak2jerome.github.io/llmdyno/ARCHITECTURE/): how the services, SDK, API, sandboxes and proxy fit together
+- [Architecture](https://speak2jerome.github.io/llmdyno/ARCHITECTURE/): how the services, SDK, API, sandboxes, proxy, events and judging fit together
 - [Releasing](https://speak2jerome.github.io/llmdyno/RELEASING/)
+- [Changelog](https://speak2jerome.github.io/llmdyno/CHANGELOG/)
 - [Source code on GitHub](https://github.com/speak2jerome/llmdyno)
 - [Package on PyPI](https://pypi.org/project/llmdyno/)
 - [Package on npm](https://www.npmjs.com/package/llmdyno)
-- [Changelog](https://github.com/speak2jerome/llmdyno/blob/main/CHANGELOG.md)
 - [Project page at Zynxtech](https://zynxtech.in/projects/llmdyno/)

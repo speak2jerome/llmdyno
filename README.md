@@ -5,7 +5,9 @@
 <p align="center">
   <a href="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml"><img src="https://github.com/speak2jerome/llmdyno/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/speak2jerome/llmdyno/releases"><img src="https://img.shields.io/github/v/release/speak2jerome/llmdyno?include_prereleases&label=release" alt="Latest release"></a>
-  <a href="https://pypi.org/project/llmdyno/"><img src="https://img.shields.io/pypi/v/llmdyno" alt="PyPI"></a>
+  <!-- The PyPI badge reads PyPI's JSON API directly: shields.io's own /pypi/v badge is cached for six hours, so it
+       showed the previous version for most of a release day. This one is cached for two minutes. -->
+  <a href="https://pypi.org/project/llmdyno/"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpypi.org%2Fpypi%2Fllmdyno%2Fjson&query=%24.info.version&prefix=v&label=pypi&color=orange" alt="PyPI version"></a>
   <a href="https://www.npmjs.com/package/llmdyno"><img src="https://img.shields.io/npm/v/llmdyno" alt="npm"></a>
   <a href="https://speak2jerome.github.io/llmdyno/"><img src="https://img.shields.io/badge/docs-speak2jerome.github.io-blue" alt="Documentation"></a>
   <a href="https://github.com/speak2jerome/llmdyno/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -18,9 +20,9 @@
 
 **LLMDyno is an open-source benchmark for running local and cloud LLMs as coding agents.** You pick models (GGUF files
 through llama.cpp on your own GPU, or APIs such as OpenAI, Anthropic, Gemini, DeepSeek, Kimi and Qwen), pick an agent
-harness (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent), and LLMDyno runs real multi-file coding
-tasks in offline Docker sandboxes. Hidden tests grade the result, LLM judges review the code blind, and a dashboard
-compares correctness, code quality, speed, VRAM and cost.
+harness (Pi, OpenCode, Codex CLI, Qwen Code, Crush, Aider, mini-SWE-agent, or your own agent), and LLMDyno runs real
+multi-file coding tasks in offline Docker sandboxes. Hidden tests grade the result, LLM judges can review the code
+blind, and a dashboard compares correctness, code quality, speed, VRAM and cost.
 You can drive it from the web dashboard, from Python (`pip install llmdyno`), from the command line, or from
 JavaScript and TypeScript (`npx llmdyno`, `npm install llmdyno`).
 
@@ -40,7 +42,7 @@ Project page: [zynxtech.in/projects/llmdyno](https://zynxtech.in/projects/llmdyn
 
 - [Why LLMDyno](#why-llmdyno)
 - [Features](#features)
-- [Quick start](#quick-start) · [Use it from Python](#use-it-from-python) · [Use it from JavaScript](#use-it-from-javascript-and-typescript)
+- [Quick start](#quick-start) · [Use it from Python](#use-it-from-python) · [Use it from JavaScript](#use-it-from-javascript-and-typescript) · [Documentation](#documentation)
 - [Round 1 results: 15 configurations on an RTX 5080](#round-1-results-15-configurations-on-an-rtx-5080)
 - [Public benchmarks: SWE-bench, Aider polyglot, Artificial Analysis](#public-benchmarks-swe-bench-aider-polyglot-artificial-analysis)
 - [How it works](#how-it-works)
@@ -68,7 +70,7 @@ a model failed.
 - Detects CPU features (AVX2/AVX-512 on x86-64; NEON, dot product, i8mm and SVE on ARM), RAM, NVIDIA/AMD/Intel/Apple
   GPUs, driver, CUDA version, disks and Docker on Windows, Linux and macOS.
 - Installs a matching prebuilt [llama.cpp](https://github.com/ggml-org/llama.cpp) build for your OS and CPU
-  architecture (CUDA 12/13, Metal, Vulkan, ROCm, SYCL, OpenCL for Adreno, or CPU), or uses yours.
+  architecture (CUDA 12/13, Metal, Vulkan, ROCm, SYCL, OpenVINO, OpenCL for Adreno, or CPU), or uses yours.
 - On Apple Silicon it plans memory around the GPU's share of unified memory (the Metal working-set limit), not the
   whole RAM, and tells you how to raise that limit.
 
@@ -86,11 +88,13 @@ a model failed.
 A quick test loads the model and measures real VRAM, decode speed and tool calling in about 20 seconds.
 
 **Cloud providers**: OpenAI, Anthropic, Google Gemini, DeepSeek, Moonshot (Kimi), Z.ai, Qwen, MiniMax, xAI, Mistral,
-OpenRouter, Groq, Together, Fireworks, Cerebras, or any OpenAI-compatible endpoint. Keys are encrypted at rest and
-never enter a sandbox. Spend caps per provider and per plan are enforced by a proxy, so a looping agent can't run up a bill.
+OpenRouter, Groq, Together, Fireworks, Cerebras, a LiteLLM proxy, or any OpenAI-compatible endpoint (Ollama,
+LM Studio, vLLM, SGLang, llama-server). Keys stay on your machine (encrypted with DPAPI on Windows, in a file only
+you can read on Linux and macOS) and never enter a sandbox. Spend caps per provider and per plan are enforced by a proxy, so a looping agent can't run up a bill.
 
-**Agent harnesses**: seven open-source harnesses in offline Docker sandboxes, each run against the same tasks, plus
-custom harnesses from a JSON manifest. A proxy records every request, so transcripts (thinking, tool calls, results)
+**Agent harnesses**: seven agent harnesses in offline Docker sandboxes, each run against the same tasks, plus custom
+harnesses from a manifest and your own Python or TypeScript agent (LangGraph, the OpenAI Agents SDK, the Vercel AI
+SDK, Mastra, …). A proxy records every request, so transcripts (thinking, tool calls, results)
 look the same whichever harness ran.
 
 <img src="https://raw.githubusercontent.com/speak2jerome/llmdyno/main/docs/images/run-transcript.png" alt="Live run transcript with tool calls, token counts and decode speed" width="100%">
@@ -103,18 +107,23 @@ polyglot benchmark from the Benchmarks page (see below).
 **Plans**: profiles × harnesses × benchmarks × iterations. Preflight checks compatibility, memory and budget; local
 runs share the GPU one model at a time while cloud runs go in parallel. Pause, resume, retry and cancel at any point.
 
-**Judging**: blind, shuffled LLM code review with an editable rubric and as many judges as you like, local or cloud.
-LLMDyno reports how much the judges agree and whether a judge favours its own vendor's models.
+**Judging**: blind, shuffled LLM code review with an editable rubric and as many judges as you like, local or cloud,
+run after a plan from the Judging page or `llmdyno.review()`. LLMDyno reports how much the judges agree and whether
+a judge favours its own vendor's models.
 
-**Python API**: `import llmdyno` and do all of the above from a script or notebook: `cloud_model()`, `local_model()`,
-`bench()`, `Results.to_pandas()`. Same engine and data folder as the app.
+**Python API and command line**: `import llmdyno` and do all of the above from a script or notebook: `cloud_model()`,
+`local_model()`, `bench()`, `Results.to_pandas()`. Every call is also a `llmdyno` command. Same engine and data
+folder as the app, and it can drive LLMDyno on another machine.
+
+**JavaScript and TypeScript**: `npx llmdyno` starts it, and the `llmdyno` npm package is a typed client with every
+operation of the web API.
 
 **Results dashboard**: weighted leaderboard with 95% confidence intervals, per-benchmark heatmap, radar profiles, a
 cost/speed/quality scatter with the Pareto front, consistency (pass@k, pass^k), token use, harness comparison, rubric
 heatmap, side-by-side compare, and CSV/JSON export. Vendor and model-family logos everywhere.
 
-**Panic stop**: one red button (or Ctrl+Shift+X) cancels every run and job, removes every sandbox and proxy container
-and kills llama-server, after a confirmation.
+**Panic stop**: one red button (or Ctrl+Shift+X, on a Mac too) cancels every run and job, removes every sandbox and
+proxy container and kills llama-server, after a confirmation.
 
 **A mascot with a job**: the pixel dino sprints on its treadmill while a benchmark runs, sits on the podium while
 judges deliberate, and freezes red on a panic stop. The browser tab icon and title follow along, so you can see
@@ -128,8 +137,10 @@ progress from another tab.
 ## Quick start
 
 **Requirements**: Windows 10/11, Linux or macOS 13+, on x86-64 or ARM64 (Apple Silicon included), Python 3.11+, and
-Docker (Docker Desktop on Windows and macOS). A GPU is recommended for local models (NVIDIA, AMD, Intel, or any Apple
-Silicon Mac); cloud-only use works without one.
+Docker (Docker Desktop on Windows and macOS; Docker Engine on Linux, with your user in the `docker` group). A GPU is
+recommended for local models (NVIDIA, AMD, Intel, or any Apple Silicon Mac); cloud-only use works without one.
+The first setup downloads several GB (sandbox images, llama.cpp), plus the models you choose. The
+[getting started guide](https://speak2jerome.github.io/llmdyno/GETTING_STARTED/) walks through it.
 
 From PyPI:
 
@@ -137,6 +148,9 @@ From PyPI:
 pip install llmdyno
 llmdyno serve --open        # the web app; or use it from Python (below)
 ```
+
+Or with Node 22+ and no Python setup of your own: `npx llmdyno` (it runs LLMDyno through an installed copy, uv or
+pipx).
 
 Or from a clone, with a setup script that creates a virtual environment for you:
 
@@ -157,8 +171,9 @@ Linux and macOS:
 ./setup.sh
 ```
 
-The setup script creates a virtual environment, installs LLMDyno and starts it at <http://127.0.0.1:8777>. The
-first-run wizard checks your system, installs llama.cpp and builds the sandbox images. To start it again later:
+The setup script creates a virtual environment, installs LLMDyno (editable, so data goes to `./data`) and starts it
+at <http://127.0.0.1:8777>; `-NoStart` / `--no-start` skips the start. The first-run wizard checks your system,
+installs llama.cpp and builds the sandbox images. To start it again later:
 
 ```bash
 .venv/bin/llmdyno serve --open        # Windows: .venv\Scripts\llmdyno serve --open
@@ -167,11 +182,13 @@ first-run wizard checks your system, installs llama.cpp and builds the sandbox i
 Want to look around first? **Settings → Sample results** loads the round-1 study below, so the dashboard has data
 before you run anything.
 
-Other commands: `llmdyno doctor` (check dependencies), `llmdyno specs` (print the detected hardware),
-`llmdyno --version`, and every library call as a command (`llmdyno list-models`, `llmdyno bench ...`,
-`llmdyno run transcript RUN_ID`, `--json` for scripts); `llmdyno --help` lists them. Data lives in `./data` inside the checkout (or `%LOCALAPPDATA%\LLMDyno`,
-`~/Library/Application Support/LLMDyno` or `~/.local/share/llmdyno` for a pip install), or wherever `LLMDYNO_DATA`
-points.
+Other commands: `llmdyno doctor` (check dependencies), `llmdyno setup` (install what is missing), `llmdyno specs`
+(print the detected hardware), `llmdyno --version`, and every library call as a command (`llmdyno list-models`,
+`llmdyno bench ...`, `llmdyno run transcript RUN_ID`, `--json` for scripts); `llmdyno --help` lists them, and the
+[command line reference](https://speak2jerome.github.io/llmdyno/reference/cli/) has them all. Data lives in `./data` inside the checkout, or for a pip
+install in `%LOCALAPPDATA%\LLMDyno`, `~/Library/Application Support/LLMDyno` or `~/.local/share/llmdyno`;
+`LLMDYNO_DATA` or `--data DIR` picks another folder, and `llmdyno data-dir` prints the one in use. See
+[configuration](https://speak2jerome.github.io/llmdyno/CONFIGURATION/).
 
 ## Use it from Python
 
@@ -180,11 +197,13 @@ Everything the app does is also a library. Describe the models, call `bench()`, 
 ```python
 import llmdyno
 
-gpt = llmdyno.cloud_model("openai", "gpt-6-luna", reasoning_effort="low", budget_usd=2)   # key from OPENAI_API_KEY
+gpt = llmdyno.cloud_model("openai", "gpt-6-luna", reasoning_effort="low", budget_usd=2)   # key from OPENAI_API_KEY;
+                                                                     # $2 hard cap for the OpenAI provider
 qwen = llmdyno.local_model("unsloth/Qwen3.8-27B-GGUF", quant="UD-Q3_K_XL", ctx=49152)    # downloads once
 
 results = llmdyno.bench([gpt, qwen], benchmarks="suite_quick", harnesses="pi")
-print(results)                      # leaderboard; results.to_pandas(), .to_csv(), .open() for the dashboard
+print(results)                      # leaderboard; .to_csv(), .open() for the dashboard, .to_pandas() with [pandas]
+llmdyno.review(results.plan_ids, judges=[gpt])   # optional: blind code review by judge profiles
 ```
 
 `llmdyno.setup()` installs what is missing (images, llama.cpp). `bench()` checks the plan before it starts and raises
@@ -200,15 +219,12 @@ The library can do everything the dashboard does, and every call is also a comma
 - your own LangGraph, OpenAI Agents SDK, smolagents or PydanticAI agent;
 - Inspect AI, and pytest and CI regression checks.
 
-With `llmdyno.connect()`, it drives LLMDyno on another machine.
+With `llmdyno.connect("http://gpu-box:8777", token=...)` (after `llmdyno serve --host 0.0.0.0` there), it drives
+LLMDyno on another machine.
 
-The [documentation site](https://speak2jerome.github.io/llmdyno/) has the guides and an API reference generated from the code:
-- [the Python library and CLI](https://speak2jerome.github.io/llmdyno/LIBRARY/)
-- [integrations](https://speak2jerome.github.io/llmdyno/INTEGRATIONS/)
-- [remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/)
-- [API reference](https://speak2jerome.github.io/llmdyno/reference/)
-
-Runnable examples and notebooks are in [examples/](https://github.com/speak2jerome/llmdyno/tree/main/examples).
+See [the Python library and CLI](https://speak2jerome.github.io/llmdyno/LIBRARY/), [integrations](https://speak2jerome.github.io/llmdyno/INTEGRATIONS/) and
+[remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/). Runnable examples and notebooks are in
+[examples/](https://github.com/speak2jerome/llmdyno/tree/main/examples).
 
 ## Use it from JavaScript and TypeScript
 
@@ -223,10 +239,25 @@ const results = await dyno.bench("Qwen3.8 27B Q3_K_XL 32k", { benchmarks: "suite
 console.table(results.leaderboard());
 ```
 
-Your own TypeScript agent can be benchmarked too. Templates for the Vercel AI SDK, Mastra, LangGraph.js and the
+`connect()` reads `LLMDYNO_URL` and `LLMDYNO_TOKEN` for a server on another machine. Your own TypeScript agent can
+be benchmarked too. Templates for the Vercel AI SDK, Mastra, LangGraph.js and the
 OpenAI Agents SDK are in
 [examples/agents/ts](https://github.com/speak2jerome/llmdyno/tree/main/examples/agents/ts). See the
 [JavaScript and TypeScript guide](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/).
+
+## Documentation
+
+The [documentation site](https://speak2jerome.github.io/llmdyno/) has guides and references, all checked against the code:
+
+- [Getting started](https://speak2jerome.github.io/llmdyno/GETTING_STARTED/): install, set up, run a first benchmark four ways.
+- [The dashboard](https://speak2jerome.github.io/llmdyno/DASHBOARD/): every page, button and warning of the web app.
+- [Python library and CLI](https://speak2jerome.github.io/llmdyno/LIBRARY/), [integrations](https://speak2jerome.github.io/llmdyno/INTEGRATIONS/),
+  [remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/), [JavaScript and TypeScript](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/).
+- [Writing a benchmark](https://speak2jerome.github.io/llmdyno/BENCHMARKS/), [adding a harness](https://speak2jerome.github.io/llmdyno/HARNESSES/).
+- [Configuration](https://speak2jerome.github.io/llmdyno/CONFIGURATION/): the data folder, settings, environment variables and ports.
+- [Troubleshooting](https://speak2jerome.github.io/llmdyno/TROUBLESHOOTING/): Docker, VRAM, downloads, runs and remote access.
+- Reference: [the Python API](https://speak2jerome.github.io/llmdyno/reference/), [every command](https://speak2jerome.github.io/llmdyno/reference/cli/) and
+  [every web API route](https://speak2jerome.github.io/llmdyno/reference/web-api/).
 
 ## Round 1 results: 15 configurations on an RTX 5080
 
@@ -340,16 +371,18 @@ More detail: [docs/ARCHITECTURE.md](https://github.com/speak2jerome/llmdyno/blob
 | Custom | any | any | JSON manifest: image, config files, command |
 
 **Providers**: OpenAI, Anthropic, Google Gemini, DeepSeek, Moonshot (Kimi), Z.ai (GLM), Qwen (DashScope), MiniMax,
-xAI, Mistral, OpenRouter, Groq, Together, Fireworks, Cerebras, and any OpenAI-compatible URL (vLLM, LM Studio, Ollama).
+xAI, Mistral, OpenRouter, Groq, Together, Fireworks, Cerebras, a LiteLLM proxy (Azure OpenAI, Bedrock, Vertex AI and
+more behind it), and any OpenAI-compatible URL (vLLM, SGLang, LM Studio, Ollama, llama-server).
 
 **Hardware and platforms**:
 
 | Platform | llama.cpp build | GPU telemetry | Notes |
 |---|---|---|---|
-| Windows 10/11, x86-64 | CUDA 12/13, Vulkan, SYCL, CPU | VRAM, power, temperature, shared-memory spill | tested most |
+| Windows 10/11, x86-64 | CUDA 12/13, Vulkan, ROCm, SYCL, OpenVINO, CPU | VRAM, power, temperature, shared-memory spill | tested most |
 | Linux, x86-64 | CUDA 12/13, Vulkan, ROCm, SYCL, OpenVINO, CPU | VRAM, power, temperature | |
 | macOS 13+, Apple Silicon | Metal | GPU memory in use, utilisation | unified memory: plans against the Metal working-set limit; power needs root, so local runs have no energy cost |
 | Linux, ARM64 (Graviton, Ampere, Grace, Raspberry Pi 5) | CPU, Vulkan, CUDA 13 (Grace) | NVIDIA if present | |
+| macOS, Intel | CPU | – | no GPU acceleration |
 | Windows on ARM (Snapdragon X) | CPU, OpenCL for Adreno, Vulkan | – | experimental |
 
 SWE-bench's task images are x86-64 only. On ARM64 machines they run under emulation (Rosetta in Docker Desktop on
@@ -359,8 +392,8 @@ in the plan preflight. Everything else, including the sandbox, harness and polyg
 ## FAQ
 
 ### What is LLMDyno?
-A local web app that benchmarks LLMs as coding agents. It runs open-source agent harnesses against coding tasks with
-hidden tests, on local models (llama.cpp) or cloud APIs, and compares correctness, code quality, speed, VRAM and cost.
+A local web app, Python library and command line that benchmarks LLMs as coding agents. It runs agent harnesses
+against coding tasks with hidden tests, on local models (llama.cpp) or cloud APIs, and compares correctness, code quality, speed, VRAM and cost.
 
 ### How is it different from SWE-bench or Aider's leaderboard?
 Those publish fixed results for fixed setups. LLMDyno is a tool you run yourself, so you can test the exact quant,
@@ -388,8 +421,9 @@ Each provider and each plan has a hard budget. The proxy between the agent and t
 budget is reached, and it counts spend even for requests that are cut off mid-stream. The panic stop halts everything.
 
 ### Are my API keys safe?
-Keys are encrypted at rest (Windows DPAPI; file permissions on Linux and macOS) and only the per-run proxy container
-receives one. Agents get a placeholder key and have no internet access.
+Keys are kept in `secrets.json` in your data folder: encrypted with DPAPI on Windows, and in a file only your user
+can read (mode 600) on Linux and macOS. Only the per-run proxy container receives one; agents get a placeholder key
+and have no internet access.
 
 ### Which harness should I use?
 Run the same models through several and compare; the dashboard has a harness comparison chart. In our smoke tests
@@ -403,6 +437,14 @@ reference solution. See [docs/BENCHMARKS.md](https://github.com/speak2jerome/llm
 ### Does it work without a GPU?
 Yes, for cloud models. Local models also run on the CPU, but agentic tasks with long contexts will be very slow, and
 LLMDyno tells you so up front.
+
+### Can I run it on a GPU server and use it from my laptop?
+Yes. Start it with `llmdyno serve --host 0.0.0.0` on the server; other machines then need the access token it prints.
+See [remote mode](https://speak2jerome.github.io/llmdyno/REMOTE/).
+
+### Something doesn't work. Where do I look?
+Run `llmdyno doctor`, then see [troubleshooting](https://speak2jerome.github.io/llmdyno/TROUBLESHOOTING/). If that doesn't help, open an
+[issue](https://github.com/speak2jerome/llmdyno/issues) with the output.
 
 ## Contributing
 

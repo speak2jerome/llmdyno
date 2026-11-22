@@ -5,22 +5,84 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 While LLMDyno is 0.x, a minor release (0.2.0) may change the HTTP API, the data folder layout or the database schema.
 Schema changes always ship with an automatic migration; a data folder written by a newer release is refused rather
-than modified. Patch releases (0.1.1) only fix bugs.
+than modified. Patch releases (0.1.1) never change the API, the data folder or the schema: they fix bugs, and may
+update packaging, documentation and metadata.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-22
+
+### Added
+
+- **Documentation:** new pages for getting started, the dashboard (every page and button), configuration (the data
+  folder, every setting, environment variables, ports, key storage) and troubleshooting. A command line reference and
+  a web API map (each route with its Python call, command and JavaScript method) are generated from the code, and a
+  test fails when they fall behind. The changelog is on the docs site, and `examples/` has an index.
+- `llmdyno setup --llama-cpp VARIANT` picks the llama.cpp build from the command line (`cuda-13`, `metal`, `cpu`, …),
+  as `setup(llama_cpp=...)` already could.
+- Tests that the committed web UI loads files that exist, that the repository's `llms.txt` matches the docs site's, and
+  that the docs site has every page in its navigation with no broken links to headings.
+
+### Changed
+
+- The README's PyPI badge reads PyPI's JSON API. shields.io caches its usual PyPI badge for six hours, so after a
+  release it kept showing the old version.
+- Every public library call and object has a docstring, which also gives every command its help text.
+- The guides were checked against the code and corrected. Among the fixes:
+  - API keys are encrypted only on Windows; on Linux and macOS they are kept in a file only your user can read.
+  - A reverse proxy in front of a remote server must send `X-Forwarded-For`, or its requests count as local and need
+    no token. nginx doesn't send it by default; the remote mode guide now shows the line to add.
+  - A benchmark needs `"workspace"` in `benchmark.json` for its starter files to be used.
+  - `budget_usd` in `cloud_model()` is the provider's shared cap, and `Plan.resume()` waits unless `wait=False`.
+  - The JavaScript guide documents every client method, option, event and error.
+- The release instructions and `scripts/bump_version.py` stage new files (`git add -A`): `git commit -am` would leave
+  out the rebuilt UI's new files.
+- The plan builder starts from the "Cloud runs in parallel" default in Settings instead of always 3.
+- The examples say what they need, `swebench_mini.py` takes the profile to use, and the CI example caps each pull
+  request's spend instead of using up the provider's budget.
+
+### Security
+
+- **Web pages can no longer use LLMDyno through your browser.** Requests from your own machine need no token, and two
+  kinds of web page could exploit that. A page that made its own domain resolve to 127.0.0.1 (DNS rebinding) could
+  call the whole API. Any page could send requests that change things, such as starting a plan, stopping everything or
+  changing settings, and open the live event stream. Now a request counts as local only when its `Host` is
+  `localhost`, `127.0.0.1` or `[::1]`, and a browser request from a page on another site is refused (403), WebSocket
+  included. The dashboard, the library, the command line and the JavaScript client work as before.
+
+### Fixed
+
+- Waiting on a job that a server restart interrupted (`Job.wait()`, `watch()`, `bench()` while the server restarts)
+  never returned, in Python and in the JavaScript client.
+- The plan preflight compared a cloud estimate with the provider's whole budget, ignoring what had been spent.
+- The notebook live panel always showed "–" for GPU use and VRAM.
+- `llmdyno results --plans` and `llmdyno review --plans` took only one plan.
+- `Results.plot.pareto()` drew instruction following, efficiency and pass@k from 0 to 1 instead of 0 to 100.
+- Command help was cut off at "e.g.".
+- The Hugging Face token field in Settings reported "Token saved" even when saving failed.
+- The first-run wizard said ARM support was planned; it has been supported since 0.2.0.
+
 ## [0.6.2] - 2026-11-22
+
+### Added
+
+- `codemeta.json` with the project's metadata in a machine-readable form; the version script keeps it current.
 
 ### Changed
 
 - LLMDyno is part of [Zynxtech open source](https://zynxtech.in/), by Jerome Eliezer. The package metadata on PyPI and
   npm, `CITATION.cff`, the license and the contact addresses now say so. The project page,
   https://zynxtech.in/projects/llmdyno/, is the homepage on PyPI, npm and GitHub.
-- New `codemeta.json` with the project's metadata in a machine-readable form; the version script keeps it current.
 - The docs site's structured data names the author and publisher, using the same IDs as zynxtech.in. Its footer links to
   the project page, GitHub, PyPI and npm.
 
 ## [0.6.1] - 2026-11-22
+
+### Changed
+
+- The README has an npm badge.
+- Releases now publish the npm package automatically: npm's trusted publishing is set up for the Release workflow's
+  npm job (added in 0.6.0) and switched on, so packages carry provenance and no token is stored.
 
 ### Fixed
 
@@ -28,12 +90,6 @@ than modified. Patch releases (0.1.1) only fix bugs.
   browser it works only on pages that the LLMDyno server serves itself, because the server sends no CORS headers.
 - `Profile.check()` in the JavaScript client threw at once for a cloud profile instead of returning a rejected
   promise.
-
-### Changed
-
-- The README has an npm badge.
-- The Release workflow now publishes the npm package too, through npm's trusted publishing and with provenance, so no
-  token is stored.
 
 ## [0.6.0] - 2026-11-22
 
@@ -66,8 +122,8 @@ There is no 0.4.0. Full library parity, the integrations and remote mode ship to
 
 ### Added
 
-- **The library can do everything the dashboard does.** Every web API route has a library call (116 of them), and a
-  test keeps it that way. New objects with their methods: `Model`, `Provider`, `Harness`, `Benchmark`, `Suite`, `Run`,
+- **The library can do everything the dashboard does.** Every web API route has a library call, and a test keeps it
+  that way. New objects with their methods: `Model`, `Provider`, `Harness`, `Benchmark`, `Suite`, `Run`,
   `Transcript`, `Settings` and `Job`. Among the new calls:
   - models: `search_models()`, `repo_info()`, `estimate()` (fit before downloading), `download_model()`,
     `import_models()`, `recommended_models()`, `Model.contexts()`, `.profile()`, `.pause()`, `.resume()`, `.delete()`;
@@ -257,7 +313,8 @@ First public release.
   title follow it.
 - Bundled sample results: 15 configurations × 5 tasks on an RTX 5080, judged by two models.
 
-[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/speak2jerome/llmdyno/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/speak2jerome/llmdyno/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/speak2jerome/llmdyno/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/speak2jerome/llmdyno/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/speak2jerome/llmdyno/compare/v0.5.0...v0.6.0

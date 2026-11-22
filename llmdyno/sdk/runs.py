@@ -115,6 +115,7 @@ class Run(Handle):
 
     @property
     def correctness(self) -> float | None:
+        """Share of hidden tests passed, from 0 to 1 (None until graded)."""
         return self._data.get("correctness")
 
     @property
@@ -124,9 +125,11 @@ class Run(Handle):
 
     @covers("GET /api/runs/{rid}")
     def refresh(self) -> "Run":
+        """Read the run again: status, stage, scores, time, tokens and cost."""
         return super().refresh()
 
     def plan(self) -> "Plan":
+        """The plan this run belongs to."""
         from .plans import Plan
         return Plan(self._data["plan_id"])
 
@@ -179,6 +182,7 @@ class Run(Handle):
 
     @covers("POST /api/runs/{rid}/cancel")
     def cancel(self) -> None:
+        """Stop the run. It is marked cancelled, and what it did so far is kept."""
         call("runs.cancel_run", rid=self.id)
 
     @covers("POST /api/runs/{rid}/retry")

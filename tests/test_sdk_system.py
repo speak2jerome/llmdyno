@@ -41,6 +41,19 @@ def test_jobs_list_and_clear():
         llmdyno.Job("job_from_another_process").cancel()
 
 
+def test_waiting_on_an_interrupted_job_ends():
+    """A server restart marks running jobs "interrupted"; wait() must raise instead of polling forever."""
+    from llmdyno import db, jobs
+    jid = jobs.submit("test", "Restarted job", lambda ctx: None)
+    llmdyno.job(jid).wait(quiet=True)
+    with db.Session() as s:
+        s.get(db.Job, jid).status = "running"
+        s.commit()
+    jobs.mark_interrupted()
+    with pytest.raises(llmdyno.LLMDynoError, match="interrupted: server restarted"):
+        llmdyno.job(jid).wait(quiet=True)
+
+
 def test_settings_read_update_and_validate():
     s = llmdyno.settings()
     before = s.cloud_concurrency

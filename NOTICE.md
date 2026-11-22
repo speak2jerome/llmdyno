@@ -21,7 +21,20 @@ LLMDyno is MIT licensed (see [LICENSE](LICENSE)). It bundles or downloads the fo
 - Agent harnesses, installed into Docker images when you build them: Pi (MIT), OpenCode (MIT), Codex CLI
   (Apache 2.0), Qwen Code (Apache 2.0), Crush (FSL-1.1-MIT), Aider (Apache 2.0) and mini-SWE-agent (MIT). Each keeps
   its own licence.
+- Docker base images for the sandbox, code-quality, polyglot and portable-runtime images: `python:3.12-slim-bookworm`,
+  `node:24-bookworm-slim`, `ubuntu:22.04`, `golang`, `rust` and `eclipse-temurin`, each under its own licences, and
+  [uv](https://github.com/astral-sh/uv) (MIT / Apache 2.0) with
+  [python-build-standalone](https://github.com/astral-sh/python-build-standalone) Pythons for the portable runtimes.
 - Models you choose from Hugging Face, under their own licences.
+
+When you use them:
+
+- [SWE-bench](https://www.swebench.com): the official evaluation harness (MIT, installed from PyPI into its own
+  virtual environment), the SWE-bench Verified, Lite and Verified mini datasets (from Hugging Face), and the official
+  task images, each with its repository's licence.
+- The [Aider polyglot benchmark](https://github.com/Aider-AI/polyglot-benchmark) exercises (MIT, from Exercism).
+- [Artificial Analysis](https://artificialanalysis.ai) reference data, with your own free API key, shown with a link
+  back to the source; and OpenRouter's public model and price catalog, for looking up prices.
 
 ## Trademarks
 

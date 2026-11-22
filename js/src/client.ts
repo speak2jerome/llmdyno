@@ -14,6 +14,7 @@ export interface Download {
   content: string | Uint8Array;
 }
 
+/** Options for connect() and new Client(). */
 export interface ClientOptions {
   /** The server's access token. Only needed from another machine (see `llmdyno token` on the server). */
   token?: string;
@@ -25,19 +26,25 @@ export interface ClientOptions {
   WebSocket?: typeof WebSocket;
 }
 
+/** Options for bench() and preflight(): what to run and the plan's limits. */
 export interface BenchOptions {
   /** Benchmark or suite ids (default "suite_quick"); see listBenchmarks() and listSuites(). */
   benchmarks?: string | string[];
   /** Harness ids (default "pi"): pi, opencode, codex, qwen-code, crush, aider, mini-swe-agent, or your own. */
   harnesses?: string | string[];
+  /** Runs of each profile × harness × benchmark (default 1; 3 or more gives confidence intervals). */
   iterations?: number;
+  /** The plan's name (default: one with the date). */
   name?: string;
   /** Caps this plan's cloud spend, on top of each provider's own cap. */
   budgetUsd?: number;
   /** Run the code-quality checks after grading (default true). */
   quality?: boolean;
+  /** Multiplies every benchmark's time limit (default 1), for slow machines or CPU-only models. */
   timeoutMultiplier?: number;
+  /** Cloud runs in parallel (default: the server's cloud_concurrency setting, 3). */
   cloudConcurrency?: number;
+  /** Let local profiles run although their memory check says they spill out of VRAM; the results are flagged. */
   allowSpill?: boolean;
   /** Start even with danger warnings (VRAM spill, out of memory …); the results are flagged. */
   acknowledgeRisks?: boolean;
@@ -45,13 +52,23 @@ export interface BenchOptions {
   onEvent?: (event: LiveEvent) => void;
 }
 
+/** Options for cloudModel(). */
 export interface CloudModelOptions {
-  /** Stored encrypted on the server and only ever used by its proxy. Omit it to use the key the server has. */
+  /**
+   * Saved on the server (encrypted with DPAPI on Windows, in a file only its user can read elsewhere), never sent
+   * back, and only ever used by its proxy. It replaces a saved key. Omit it to use the key the server has.
+   */
   apiKey?: string;
+  /** The profile's name (default: model · vendor · reasoning effort). */
   name?: string;
+  /** The endpoint of an OpenAI-compatible server; required for vendor "custom". */
   baseUrl?: string;
+  /** Which API to speak when the vendor offers several: "openai-chat", "openai-responses" or "anthropic". */
   apiStyle?: string;
-  /** Hard spend cap for this provider (a new provider gets $5). */
+  /**
+   * Hard spend cap of the provider, shared by every model of that provider (a new provider gets $5). On an existing
+   * provider this changes its cap.
+   */
   budgetUsd?: number;
   /** "auto" looks the price up (OpenRouter's catalog), or give {input, output, cached} in $ per 1M tokens. */
   pricing?: "auto" | { input?: number; output?: number; cached?: number };
@@ -77,16 +94,24 @@ function warn(message: string): void {
  * Every operation of the web API is also available, typed, under `api` (dyno.api.runs.runTranscript({ rid })).
  */
 export class Client {
+  /** The server's address, without a trailing slash. */
   readonly url: string;
+  /** The access token sent with every request, if any. */
   readonly token: string | undefined;
   /** What the server said about itself on connect: version, data folder, … */
   server: Record<string, unknown> = {};
   /** Every web API operation, grouped by area. */
   readonly api: Api;
+  /** Milliseconds before a single request gives up. */
   readonly timeoutMs: number;
+  /** The WebSocket class used for live events (undefined: events are polled only). */
   readonly WebSocket: typeof WebSocket | undefined;
   private readonly fetchImpl: typeof fetch;
 
+  /**
+   * A client for the server at `url`. Prefer connect(), which also reads LLMDYNO_URL and LLMDYNO_TOKEN and checks
+   * that the server answers; this constructor does neither.
+   */
   constructor(url: string, options: ClientOptions = {}) {
     this.url = url.replace(/\/+$/, "");
     this.token = options.token;
@@ -186,7 +211,7 @@ export class Client {
     return this.request("GET", "/api/health", this.token ? { Authorization: `Bearer ${this.token}` } : {});
   }
 
-  /** Follow a plan, run or job live until it stops (the dashboard's events). See live.ts for the event kinds. */
+  /** Follow a plan, run or job live until it stops (the dashboard's events). See LiveEvent for the event kinds. */
   watch(target: WatchTarget, options: WatchOptions = {}): AsyncGenerator<LiveEvent> {
     return watch(this, target, options);
   }
@@ -214,8 +239,8 @@ export class Client {
 
   /**
    * A cloud model to benchmark, e.g. cloudModel("anthropic", "claude-sonnet-5-5", { reasoning_effort: "low" }).
-   * Calling it again with the same arguments returns the same profile. The API key, if you pass one, is stored
-   * encrypted on the server; without one the server uses the key it already has for that provider.
+   * Calling it again with the same arguments returns the same profile. The API key, if you pass one, is saved on
+   * the server for that provider; without one the server uses the key it already has.
    */
   async cloudModel(vendor: string, model: string, options: CloudModelOptions = {}): Promise<Profile> {
     const { apiKey, name, baseUrl, apiStyle, budgetUsd, pricing = "auto", ...settings } = options;

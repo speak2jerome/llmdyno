@@ -3,7 +3,7 @@
   "@type": "SoftwareSourceCode",
   "name": "LLMDyno",
   "description": "LLMDyno is an open-source benchmark for running local and cloud LLMs as coding agents. It runs agent harnesses on multi-file coding tasks in offline Docker sandboxes, grades them with hidden tests, static analysis and blind LLM judges, and compares correctness, code quality, speed, VRAM and cost. It is a web dashboard, a Python library, a command line and a TypeScript client.",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "dateCreated": "2026-10-25",
   "datePublished": "2026-10-26",
   "dateModified": "2026-11-22",

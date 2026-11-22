@@ -6,7 +6,7 @@ import { LogoName, profileLogo } from "../logos";
 import { api } from "../api";
 import { VerdictBadge } from "../components";
 import { fmtCtx, fmtMin, fmtUsd, plural } from "../format";
-import { keys, useBenchmarks, useHarnesses, useProfiles, useProviders, useSuites, useVendors } from "../queries";
+import { keys, useBenchmarks, useHarnesses, useProfiles, useProviders, useSettings, useSuites, useVendors } from "../queries";
 import {
   Badge, Button, Card, Checkbox, Empty, Field, Input, Notice, NumInput, PageHead, Skeleton, Spinner, Stepper, Toggle, useToast,
 } from "../ui";
@@ -31,6 +31,12 @@ export default function PlanNew() {
   const [iterations, setIterations] = useState(1);
   const [name, setName] = useState("");
   const [opt, setOpt] = useState<any>({ quality: true, cloud_concurrency: 3, timeout_multiplier: 1, budget_usd: null, allow_spill: false, auto_judge: false, memory_gb: 12 });
+  const settings = useSettings();
+  const [concurrencyTouched, setConcurrencyTouched] = useState(false);
+  useEffect(() => {   // start from the Settings default until the user changes it here
+    const dflt = settings.data?.cloud_concurrency;
+    if (!concurrencyTouched && dflt) setOpt((o: any) => ({ ...o, cloud_concurrency: dflt }));
+  }, [settings.data?.cloud_concurrency, concurrencyTouched]);
   const [judgeIds, setJudgeIds] = useState<string[]>([]);
   const [pf, setPf] = useState<any>(null);
   const [pfBusy, setPfBusy] = useState(false);
@@ -188,7 +194,7 @@ export default function PlanNew() {
           </Card>
           <Card title="Limits">
             <div className="form-grid">
-              <Field label="Cloud runs in parallel"><NumInput value={opt.cloud_concurrency} onChange={(v) => setOpt({ ...opt, cloud_concurrency: Math.max(1, Math.round(v || 1)) })} min={1} max={16} /></Field>
+              <Field label="Cloud runs in parallel"><NumInput value={opt.cloud_concurrency} onChange={(v) => { setConcurrencyTouched(true); setOpt({ ...opt, cloud_concurrency: Math.max(1, Math.round(v || 1)) }); }} min={1} max={16} /></Field>
               <Field label="Plan budget (cloud)" hint="Empty = provider budgets only"><NumInput allowEmpty value={opt.budget_usd} onChange={(v) => setOpt({ ...opt, budget_usd: v })} min={0} max={10000} suffix="USD" /></Field>
               <Field label="Timeout multiplier" tip="Scales every stage timeout, e.g. 2× for slow CPU-offloaded profiles."><NumInput value={opt.timeout_multiplier} onChange={(v) => setOpt({ ...opt, timeout_multiplier: v || 1 })} min={0.25} max={10} suffix="×" /></Field>
               <Field label="Agent memory limit"><NumInput value={opt.memory_gb} onChange={(v) => setOpt({ ...opt, memory_gb: Math.round(v || 12) })} min={2} max={128} suffix="GB" /></Field>

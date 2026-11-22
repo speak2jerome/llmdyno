@@ -65,6 +65,46 @@ def test_remote_changes_are_logged(app_client, token):
     assert len(log.read_text().splitlines()) == before + 1                                     # reads are not logged
 
 
+def test_dns_rebinding_needs_the_token(app_client, token):
+    """A page whose own domain is made to resolve to 127.0.0.1 reaches the server from a loopback address, but its
+    requests carry that domain in Host: they count as remote, so without the token they get nothing."""
+    rebound = {"Host": "evil.example:8777"}
+    assert app_client.get("/api/settings", headers=rebound).status_code == 401
+    assert app_client.post("/api/system/panic", headers=rebound).status_code == 401
+    assert app_client.get("/api/settings", headers={**rebound, "Authorization": f"Bearer {token}"}).status_code == 200
+    with pytest.raises(WebSocketDisconnect) as e:
+        with app_client.websocket_connect("/ws", headers=rebound) as ws:
+            ws.receive_text()
+    assert e.value.code == 1008
+    for host in ("localhost:8777", "127.0.0.1:8777", "[::1]:8777", "llmdyno.localhost:8777", "LOCALHOST"):
+        assert app_client.get("/api/settings", headers={"Host": host}).status_code == 200, host
+
+
+def test_pages_from_other_websites_are_refused(app_client):
+    """Local requests need no token, so a page on another site must not be able to use the API from your browser:
+    a POST has its effect even though the page can't read the answer, and a WebSocket needs no CORS at all."""
+    for origin in ("https://evil.example", "null", "http://127.0.0.1.evil.example:8777"):
+        r = app_client.patch("/api/settings", json={}, headers={"Origin": origin})
+        assert r.status_code == 403 and "refused a request from the web page" in r.json()["detail"], origin
+        assert app_client.get("/api/settings", headers={"Origin": origin}).status_code == 403
+        with pytest.raises(WebSocketDisconnect) as e:
+            with app_client.websocket_connect("/ws", headers={"Origin": origin}) as ws:
+                ws.receive_text()
+        assert e.value.code == 1008
+    # the dashboard itself, the Vite dev server and IPv6 loopback
+    for origin in ("http://127.0.0.1:8777", "http://localhost:5177", "http://[::1]:8777"):
+        assert app_client.patch("/api/settings", json={}, headers={"Origin": origin}).status_code == 200, origin
+    with app_client.websocket_connect("/ws", headers={"Origin": "http://localhost:8777"}) as ws:
+        ws.send_text(json.dumps({"sub": ["jobs"]}))
+    assert app_client.get("/").status_code == 200                    # the UI's own files are not affected
+
+
+def test_host_names():
+    assert auth._host_name("[::1]:8777") == "::1" and auth._host_name("localhost:8777") == "localhost"
+    assert auth._host_name("127.0.0.1") == "127.0.0.1" and auth._host_name("") == ""
+    assert auth._loopback_name("app.localhost") and not auth._loopback_name("localhost.evil.example")
+
+
 def test_websocket_needs_the_token(app_client, token):
     with pytest.raises(WebSocketDisconnect) as e:
         with app_client.websocket_connect("/ws", headers=FAR) as ws:

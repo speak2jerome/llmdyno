@@ -131,8 +131,8 @@ class LivePanel:
             for ev in watch(self.plan):
                 if ev.kind == "gpu" and isinstance(ev.data, dict):
                     d = ev.data
-                    self.gpu.value = (f"<small>GPU {d.get('util', d.get('gpu_util', '–'))}% · "
-                                      f"VRAM {d.get('vram_used_mib', '–')} MiB</small>")
+                    self.gpu.value = (f"<small>GPU {d.get('util_pct', '–')}% · "
+                                      f"VRAM {d.get('vram_mib', '–')} MiB</small>")
                 elif ev.kind == "run" and ev.status in RUN_FINISHED and ev.run_id not in self._done:
                     self._done.add(ev.run_id)
                     self.bar.value = len(self._done)

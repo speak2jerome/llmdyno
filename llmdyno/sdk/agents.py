@@ -2,9 +2,9 @@
 """Benchmark your own agent: python_harness() turns a Python function into a harness, so an agent built with LangGraph,
 the OpenAI Agents SDK, smolagents, PydanticAI or plain code runs in the same offline sandbox, behind the same proxy, with
 the same transcripts, budgets and grading as the built-in harnesses. node_harness() does the same for a JavaScript or
-TypeScript function: an agent built with the Vercel AI SDK, Mastra, LangChain.js or the OpenAI Agents SDK for JS.
+TypeScript function: an agent built with the Vercel AI SDK, Mastra, LangGraph.js or the OpenAI Agents SDK for JS.
 
-    h = llmdyno.python_harness("my_agent:run", requirements=["langgraph==1.0.2", "langchain-openai==1.0.1"])
+    h = llmdyno.python_harness("my_agent:run", requirements=["langgraph==1.2.24", "langchain-openai==1.8.5"])
     llmdyno.bench(qwen, "suite_quick", harnesses=h.id)
 
 The Python entry point is called once per stage, in the task's workspace, with any of these keyword arguments it

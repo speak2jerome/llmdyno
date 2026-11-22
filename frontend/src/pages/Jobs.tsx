@@ -6,7 +6,7 @@ import { fmtAgo, fmtDur } from "../format";
 import { forgetFinishedJobs, useJobs } from "../queries";
 import { Button, Card, Chip, Empty, PageHead, Progress, StatusBadge, Table, useToast } from "../ui";
 
-const KINDS = ["all", "plan", "download", "build", "install", "judge", "smoke", "validate"];
+const KINDS = ["all", "plan", "download", "build", "install", "import", "judge", "smoke", "validate"];
 
 export default function Jobs() {
   const jobs = useJobs();

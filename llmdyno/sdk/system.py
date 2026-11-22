@@ -17,10 +17,12 @@ class Doctor(list[dict[str, Any]]):
 
     @property
     def ok(self) -> bool:
+        """True when everything marked required is in place (Docker, the sandbox image, a harness)."""
         return all(d["ok"] for d in self if d["level"] == "required")
 
     @property
     def missing(self) -> list[Any]:
+        """The checks that are not OK, required or not."""
         return [d for d in self if not d["ok"]]
 
     def __str__(self):

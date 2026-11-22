@@ -181,7 +181,8 @@ def preflight(plan_spec):
                 row["cost"] += cost * iters * n_h
                 row["minutes"] += (b.get("expected_minutes") or {}).get("cloud", 3) * iters * n_h
             if prov:
-                remaining = (prov["budget_usd"] or 0) - (prov["spent_usd"] or 0)
+                from .. import llm                            # spend lives in the ledger files, not the database
+                remaining = (prov["budget_usd"] or 0) - llm.ledger_spent(prov["id"])
                 if prov["vendor"] != "custom" and row["cost"] > remaining:
                     items.append({"level": "warning", "text": f"{prof['name']}: estimated ${row['cost']:.2f} exceeds the "
                                   f"${remaining:.2f} left in the {prov['name']} budget; runs stop when it is used up."})

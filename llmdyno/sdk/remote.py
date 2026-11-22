@@ -81,6 +81,7 @@ class RemoteBackend(Backend):
 
     # -- calls
     def call(self, op: str, **kwargs: Any):
+        """Run one service operation ("runs.get_run") on the server through its web API."""
         if op not in self.routes:
             raise LLMDynoError(f"{op} is not available over the web API")
         method, path, where = self.routes[op]
@@ -123,10 +124,12 @@ class RemoteBackend(Backend):
         return r.text
 
     def health(self) -> Any:
+        """The server's health check: {ok, version, schema_version, time, data_dir}."""
         return self._result(self.http.get("/api/health"))
 
     # -- live events over the WebSocket
     def subscribe(self, fn: Any, wanted: Any, names: Any=()):
+        """Live events from the server's WebSocket; None when it can't be opened (watch() then polls)."""
         try:
             return _WsSubscription(self, fn, wanted, list(names))
         except Exception:  # noqa: BLE001 - no WebSocket (a proxy that blocks it, say): watch() polls instead
@@ -134,6 +137,7 @@ class RemoteBackend(Backend):
 
     @property
     def ui_url(self) -> str:
+        """The address of the server's web app."""
         return self.url
 
 

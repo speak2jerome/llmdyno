@@ -6,7 +6,8 @@ the result and blind LLM judges review the code, alongside speed, VRAM and cost.
 
 This package gives you two things:
 
-- **A typed client.** It drives a LLMDyno server from Node 22 or later, with the same calls as the Python library.
+- **A typed client.** It drives a LLMDyno server from Node 22 or later: the main calls of the Python library as
+  methods, and every operation of the web API, typed, under `dyno.api`.
 - **`npx llmdyno`.** It starts that server for you.
 
 LLMDyno itself is a Python app that runs agents in Docker, so you need Python 3.11+ and Docker on the machine that
@@ -19,9 +20,10 @@ npx llmdyno            # starts LLMDyno and opens the dashboard at http://127.0.
 npx llmdyno doctor     # any other argument goes to the LLMDyno command line
 ```
 
-`npx llmdyno` uses an installed LLMDyno if your Python has one. Otherwise it runs the matching version through
-[uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/). If none of those is installed, it tells you what to
-install.
+`npx llmdyno` uses an installed LLMDyno if your Python has one (set `LLMDYNO_PYTHON` to choose the Python).
+Otherwise it runs the matching version through [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/). If
+none of those is installed, it tells you what to install. `LLMDYNO_LAUNCHER_DRY_RUN=1` prints the command instead of
+running it.
 
 ## Use it from code
 
@@ -34,7 +36,7 @@ import { connect } from "llmdyno";
 
 const dyno = await connect();               // http://127.0.0.1:8777, or LLMDYNO_URL and LLMDYNO_TOKEN
 
-const gpt = await dyno.cloudModel("openai", "gpt-6-luna", { reasoning_effort: "low", budgetUsd: 2 });
+const gpt = await dyno.cloudModel("openai", "gpt-6-luna", { reasoning_effort: "low", budgetUsd: 2 });  // $2 cap for OpenAI
 const results = await dyno.bench([gpt, "Qwen3.8 27B Q3_K_XL 32k"], {
   benchmarks: "suite_quick",
   harnesses: "pi",
@@ -65,7 +67,8 @@ await dyno.api.runs.runGpu({ rid: run.id, max_points: 200 });
 ```
 
 The library raises the same errors as the Python one: `NotFoundError`, `ConflictError`, `InvalidError`,
-`PreflightError` and the rest, each with the HTTP `status`.
+`PreflightError` and the rest, each with the HTTP `status`. `budgetUsd` in `cloudModel()` is the provider's hard
+spend cap, shared by its models; `bench(..., { budgetUsd })` caps one plan.
 
 It uses only `fetch` and `WebSocket`. Other runtimes that have both, such as Bun and Deno, should work but aren't
 tested. In a browser it works only on pages that the LLMDyno server serves itself, because the server sends no CORS
@@ -76,14 +79,16 @@ On another machine, start the server with `llmdyno serve --host 0.0.0.0`. Then c
 
 ## Benchmark your own TypeScript agent
 
-An agent built with the Vercel AI SDK, Mastra, LangChain.js or the OpenAI Agents SDK can run in LLMDyno's sandbox and
+An agent built with the Vercel AI SDK, Mastra, LangGraph.js or the OpenAI Agents SDK can run in LLMDyno's sandbox and
 be graded like the built-in harnesses. Register it from Python with `llmdyno.node_harness("agent.ts:run")`. Templates
 for each framework are in
 [examples/agents/ts](https://github.com/speak2jerome/llmdyno/tree/main/examples/agents/ts).
 
 ## Links
 
-- [Documentation](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/)
+- [Documentation](https://speak2jerome.github.io/llmdyno/JAVASCRIPT/): every method, option, event and error
+- [Web API map](https://speak2jerome.github.io/llmdyno/reference/web-api/): every `dyno.api` method with its route
+- [Getting started](https://speak2jerome.github.io/llmdyno/GETTING_STARTED/) with LLMDyno itself
 - [Source and issues](https://github.com/speak2jerome/llmdyno)
 - [Python package](https://pypi.org/project/llmdyno/)
 - [Project page at Zynxtech](https://zynxtech.in/projects/llmdyno/)

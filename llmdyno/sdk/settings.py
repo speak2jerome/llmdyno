@@ -39,15 +39,18 @@ class Settings:
         return self._d[key]
 
     def get(self, key: str, default: Any = None) -> Any:
+        """One setting, or default when there is no such setting."""
         return self._d.get(key, default)
 
     def __dir__(self):
         return sorted(set(super().__dir__()) | set(self._d))
 
     def to_dict(self) -> dict[str, Any]:
+        """Every setting as a plain dict (a copy)."""
         return copy.deepcopy(self._d)
 
     def refresh(self) -> "Settings":
+        """Read the settings again."""
         self._d = call("settings.get_settings")
         return self
 
@@ -73,10 +76,11 @@ def settings() -> Settings:
 
 @covers("PUT /api/settings/hf-token")
 def set_hf_token(token: str) -> None:
-    """Save a Hugging Face token (encrypted in the data folder) for gated models and higher rate limits."""
+    """Save a Hugging Face token in the data folder's secret store, for gated models and higher rate limits."""
     call("settings.set_hf_token", body={"token": token})
 
 
 @covers("DELETE /api/settings/hf-token")
 def remove_hf_token() -> None:
+    """Delete the saved Hugging Face token."""
     call("settings.del_hf_token")

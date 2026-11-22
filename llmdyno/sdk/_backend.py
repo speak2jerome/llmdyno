@@ -5,7 +5,7 @@ Every SDK call is `call("area.function", **kwargs)`: a function in llmdyno/servi
 backend decides how that call is made:
 
 * LocalBackend (the default) runs the service in this process, on this machine's data folder.
-* RemoteBackend (llmdyno.connect, coming in 0.6) will send the same call to a LLMDyno server over HTTP.
+* RemoteBackend (llmdyno.connect()) sends the same call to a LLMDyno server over HTTP.
 
 Both return the same plain data and raise the same llmdyno.errors, so SDK objects behave the same either way. SDK code
 must not import the database or engine modules directly; anything it needs goes through a service."""

@@ -18,6 +18,9 @@ __all__ = ["ResultsPlot", "PALETTE", "COMPONENT_COLORS"]
 
 # the dashboard's chart palette (frontend/src/styles.css --c1 … --c10, light theme)
 PALETTE = ["#5b5bd6", "#12a594", "#e5940e", "#e5484d", "#3e8ef7", "#8e4ec6", "#68a73d", "#d6409f", "#0894b3", "#a17a4c"]
+# scores stored from 0 to 1 and shown from 0 to 100
+SCORES = ("final", "correctness", "instruction_following", "quality", "efficiency", "pass_at_k",
+          "consistency")
 COMPONENTS = [("correctness", "Correctness"), ("instruction_following", "Instruction following"),
               ("quality", "Code quality"), ("efficiency", "Efficiency")]
 COMPONENT_COLORS = dict(zip((k for k, _ in COMPONENTS), PALETTE))
@@ -120,7 +123,7 @@ class ResultsPlot:
 
     def pareto(self, x: str = "cost_usd_total", y: str = "final", backend: str = "matplotlib"):
         """Score against a cost (cost_usd_total, wall_s_total, peak_vram_mib, …): the best trade-offs are top left."""
-        pts = [(c.get(x), (c.get(y) or 0) * 100 if y in ("final", "correctness", "quality") else c.get(y),
+        pts = [(c.get(x), (c.get(y) or 0) * 100 if y in SCORES else c.get(y),
                 self._label(c)) for c in self._configs() if c.get(x) is not None and c.get(y) is not None]
         if backend == "plotly":
             go = self._go()

@@ -21,25 +21,41 @@ browser ── React + TS UI (Vite build, served by the backend)
    │  REST + one WebSocket (/ws, topic subscriptions)
    ▼
 llmdyno (FastAPI, runs natively on the host: it needs the GPU, the disk and Docker)
+   ├── server.py    the app: routes, the error handler, the remote-access check, the WebSocket, the built UI (web/static)
    ├── api/         thin FastAPI routes: map HTTP to service calls, nothing else
    ├── services/    what every feature does, one module per area; plain data in and out, llmdyno.errors on failure
    ├── sdk/         the Python library (import llmdyno) over the same services, through a backend seam
-   ├── system/      spec detection (CPU/ISA, RAM, GPUs/VRAM/driver, disk, Docker, WSL) and dependency checks/installers
+   ├── cli.py       the command line, generated from the library; lib.py and aio.py re-export the library
+   ├── integrations/ data frames, charts, notebooks, MLflow, W&B, Langfuse, OpenTelemetry, the Hub, Inspect AI
+   │                (client side: they use only the library; a test enforces it); pytest_plugin.py
+   ├── system/      spec detection (CPU/ISA, RAM, GPUs/VRAM/driver, disk, Docker, WSL, Apple) and dependency checks
    ├── hub/         Hugging Face search, remote GGUF header parsing (HTTP range), resumable downloads
    ├── memory.py    VRAM/RAM projection: estimator (pre-download) + llama-fit-params dry run (post-download) + warnings
-   ├── inference/   llama.cpp release installer and llama-server lifecycle; external OpenAI-compatible endpoints
+   ├── inference/   llama.cpp release installer, llama-fit-params and the llama-server lifecycle
    ├── providers/   vendor catalog (OpenAI, Anthropic, Gemini, DeepSeek, Kimi, GLM, Qwen, MiniMax, xAI, Mistral,
-   │                OpenRouter, Groq, Together, Fireworks, Cerebras, custom), key store, OpenRouter price lookup
-   ├── harnesses/   data-driven harness manifests (Pi, OpenCode, Codex, Qwen Code, Aider, mini-swe-agent, …) and image builds
-   ├── benchmarks/  built-in tasks, suites, custom benchmark creator and grader validation
+   │                OpenRouter, Groq, Together, Fireworks, Cerebras, LiteLLM, custom), local-server detection, prices
+   ├── harnesses/   built-in harness adapters (Python classes), custom manifests, image builds, portable runtimes
+   ├── benchmarks/  built-in tasks, suites, the benchmark editor's spec, validation, SWE-bench and polyglot imports,
+   │                Artificial Analysis reference data; common/ holds the grader helpers mounted at /grader_common
    ├── runner/      plan scheduler (GPU-serial local runs, parallel cloud runs), sandbox driver, metrics
    ├── proxy/       stdlib logging proxy (runs in a container): token usage, speed, cost cap, transcript capture
    ├── quality/     static analysis image (ruff, radon, bandit, vulture, coverage) and probes
    ├── judge/       blind LLM review with user-chosen judges, agreement and self-preference stats
-   └── scoring.py   configurable weights, iteration statistics (mean, sd, 95% CI, pass@k)
-SQLite (data/llmdyno.db) — profiles, providers, plans, runs, reviews, jobs
-data/runs/<plan>/<run>/ — workspace, proxy logs, transcript stream, grader output
+   ├── llm.py       host-side model calls (judging, quick tests) and the spend ledgers
+   ├── scoring.py   configurable weights, iteration statistics (mean, sd, 95% CI, pass@k)
+   ├── jobs.py      background jobs: a thread pool, progress and logs in SQLite, exclusive groups (one GPU user)
+   ├── events.py    in-process publish/subscribe feeding the WebSocket and the library's listeners
+   ├── safety.py    the panic stop; auth.py remote access; secrets.py the key store; config.py settings; db.py SQLite
+   ├── docker/      Dockerfiles of the sandbox, code-quality and polyglot images
+   └── sample/      the bundled round 1 results
+frontend/          the React UI; `npm run build` writes llmdyno/web/static, which is committed
+js/                the npm package: the TypeScript client and the npx launcher
+<data folder>/llmdyno.db — profiles, providers, plans, runs, reviews, jobs
+<data folder>/runs/<plan>/<run>/ — workspace, proxy logs, transcript stream, grader output
 ```
+
+The data folder is `./data` in a git checkout and a per-user folder otherwise; [Configuration](CONFIGURATION.md)
+lists where it is and everything in it.
 
 ### One set of services, two front ends
 
@@ -50,8 +66,9 @@ turn HTTP into service calls and back, and one exception handler in `server.py` 
 
 The library in `llmdyno/sdk/` calls services by name, `call("runs.run_transcript", rid=...)`, through a backend:
 `LocalBackend` runs them in-process, and `RemoteBackend` (from `llmdyno.connect()`) sends the same call to another
-machine's API, which has the same names and parameters. SDK modules never import the database or engine modules
-(a test enforces it), so every object works the same either way. Live events reach the library through
+machine's API, which has the same names and parameters. SDK modules reach the database and the engine only
+through services (`tests/test_library.py` checks their imports; the local backend, the remote route table and the
+parity map are the named exceptions), so every object works the same either way. Live events reach the library through
 `events.add_listener`, which works without the web server; `watch()` falls back to polling for work in another
 process. `tests/test_parity.py` maps every route to the library call that covers it (`@covers`), so a feature can't
 reach the dashboard without reaching Python too.
@@ -63,9 +80,13 @@ installed copy, uv or pipx.
 
 ### Remote access
 
-Requests from the server's own machine need nothing. Every other request, including one forwarded by a reverse proxy
-on the same machine, must present the API token (`auth.py`): an `Authorization: Bearer` header, or `?token=` for
-downloads and the WebSocket. One middleware in `server.py` checks it and logs the changes remote clients make. The
+Requests from the server's own machine need nothing, provided they name a loopback host in `Host` (so a page using
+DNS rebinding to reach 127.0.0.1 counts as remote) and don't come from a browser page on another site (an `Origin`
+that isn't a loopback name is refused with 403, and such a WebSocket is closed). Every other request to `/api`,
+including one forwarded by a
+reverse proxy that adds `X-Forwarded-For`, `Forwarded` or `X-Real-IP`, must present the API token (`auth.py`): an
+`Authorization: Bearer` header, or `?token=` (which downloads and the WebSocket use). A reverse proxy that adds none of
+those headers makes every request look local, so it must add one (see [Remote mode](REMOTE.md#https-and-reverse-proxies)). One middleware in `server.py` checks it and logs the changes remote clients make. The
 library's `RemoteBackend` (`llmdyno/sdk/remote.py`) maps each service call to its route from the API's own route
 table, so `llmdyno.connect()` needs no list of endpoints to keep in step.
 
@@ -83,7 +104,7 @@ plan = profiles × harnesses × benchmarks × iterations
   └─ scheduler groups local runs by profile (one llama-server load per profile) and runs cloud runs concurrently
        per run:
          1. copy the benchmark workspace template
-         2. start/reuse the profile's proxy container  (internal network alias → upstream: llama-server or vendor)
+         2. start the run's own proxy container  (internal network alias → upstream: llama-server or vendor)
          3. render the harness config (models.json, opencode.json, config.toml, env, …) pointing at the proxy
          4. docker run <harness image> on the internal network (no internet), per stage, with a timeout
          5. grade in a fresh offline container (hidden tests copied in only after the agent is gone)
@@ -109,8 +130,10 @@ polyglot image. ENV lines from the harness install are passed as `-e` flags, sin
 per run (env benchmark):
   1. pull the task image for its platform (linux/amd64 for SWE-bench, emulated on ARM64 hosts)
   2. volume dyno-ws-<run> <- copy of /testbed from the image
-  3. per stage: docker run <task image> -v dyno-rt-<harness>:/opt/dyno-rt -v dyno-ws-<run>:/testbed
+  3. per stage: docker run <task image> -v <runtime volume>:/opt/dyno-rt -v dyno-ws-<run>:/testbed
                 -v dyno-ws-<run>:/workspace ... bash /bench/stageN.sh   (activates conda, adds the runtime to PATH)
+     (the runtime image is llmdyno-rt-<harness>:<version>-<arch>-<hash of its Dockerfile>, copied once into a volume
+      named after it)
   4. git diff --binary <start commit> inside the volume -> model.patch   (the image's HEAD when the volume was made:
      SWE-bench images add their own commit on top of the task's base commit, and the harness applies patches there)
   5. official harness (swebench.harness.run_evaluation, own venv) grades the patch -> report.json -> resolved
@@ -120,6 +143,38 @@ per run (env benchmark):
 ```
 
 Runtimes are prepared once per plan, before any run starts, so parallel cloud runs never race to build the same image.
+
+## Live events
+
+`events.publish(topic, kind, data)` fans out to WebSocket subscribers and to the library's listeners, in process.
+Topics are `jobs`, `job:<id>`, `plans`, `plan:<id>`, `run:<id>`, `models`, `profiles`, `reviews` and `system`; a
+message is `{topic, kind, data, ts}`. On `/ws`, a client sends `{"sub": [...], "unsub": [...]}` to choose topics
+(every socket gets `jobs`). The server pings every 20 seconds, sends events in batches of up to 200, and when a client
+falls more than 5000 events behind it sends `{"topic": "*", "kind": "resync"}` instead, after which the client
+refetches. A remote socket without a valid token is closed with code 1008.
+
+## Sandboxes and networking
+
+* **Agents** run on `llmdyno-internal`, a Docker network created with `--internal`: no route to the internet or the
+  LAN. They get a memory limit (the plan's `memory_gb`, 12 GB by default), 2 to 8 CPUs and a process limit. On Linux
+  they run as your user id in the sandbox image, and as root in task images such as SWE-bench's.
+* **The proxy** for each run (512 MB, read-only code) sits on the same internal network under the run's own alias,
+  listens on port 8081, and is the only container that can reach the outside: llama-server on the host or the
+  vendor's API.
+* **llama-server** listens on 127.0.0.1 on Windows and macOS (Docker Desktop forwards `host.docker.internal`) and on
+  Docker's bridge gateway on Linux, never on 0.0.0.0. The `llama_bind_host` setting overrides it.
+* **Graders, code-quality analysis, probes, workspace copies and patch extraction** run with `--network none`. Only
+  image builds have network access.
+
+## Judging
+
+A judging job sends each finished run to each judge profile. Every judge sees a blind id per run and its own shuffled
+order, the task's prompts and the files the agent wrote (up to 450 lines per file and 90 000 characters in all), and
+optionally the static-analysis summary. It scores the rubric's dimensions (eight by default) from 1 to 10 and answers
+in JSON; the overall score defaults to the mean of the dimensions. Each review gets two attempts; a rate limit or a
+refusal stops the job. Cloud judges run in parallel (4 by default), local judges take the GPU like any local run. Runs
+a judge already reviewed are skipped unless asked. Agreement between two judges needs at least three runs both
+reviewed; self-preference compares how each judge scores its own model family against the other judges.
 
 ## Memory projection
 
@@ -144,13 +199,14 @@ models, disk space, and missing API keys or budgets.
 
 ## Data model (SQLite)
 
-Settings (folders, ports, electricity price, default scoring weights) live in `data/settings.json`; secrets in
-`data/secrets.json`, encrypted. Everything else is in SQLite:
+Settings (folders, ports, electricity price, default scoring weights) live in `settings.json` in the data folder;
+API keys and tokens in `secrets.json` (encrypted with DPAPI on Windows; on Linux and macOS a file only your user can
+read). Benchmarks you create are folders under `benchmarks/`. Everything else is in SQLite:
 
 | table | purpose |
 |---|---|
 | `models` | local GGUF files: repo, files, size, parsed metadata, download state |
-| `providers` | vendor, base URL, API style, key reference, budget (spend lives in ledger files, see below) |
+| `providers` | vendor, base URL, API style, budget (the key is in secrets.json under `provider:<id>`; spend lives in ledger files, see below) |
 | `profiles` | local / cloud / endpoint profile with inference + sampling parameters and last fit check |
 | `harness_builds` | image build status per harness manifest and version |
 | `custom_harnesses` | user harness manifests |
@@ -158,24 +214,36 @@ Settings (folders, ports, electricity price, default scoring weights) live in `d
 | `plans` | the run matrix, options, status |
 | `runs` | one profile × harness × benchmark × iteration: status, metrics, result JSON |
 | `reviews` | judge outputs per run and judge profile |
-| `jobs` | background work (downloads, installs, builds, plans, judging) with progress and logs |
+| `jobs` | background work (downloads, installs, image builds, imports, plans, judging, quick tests, validation and re-grading) with progress and logs |
 
 ## Scoring
 
-`final = w_c·correctness + w_i·instruction_following + w_q·quality + w_e·efficiency` (defaults 50/15/25/10), with
-`quality = 0.35 static + 0.30 probes + 0.35 review` re-weighted over the parts that exist. Efficiency compares wall
-time with the fastest run on the same benchmark that reached ≥ 80% correctness. Weights are adjustable live on the
-dashboard. Iterations report mean, standard deviation, 95% CI and pass@k.
+`final = w_c·correctness + w_i·instruction_following + w_q·quality + w_e·efficiency` (defaults 50/15/25/10),
+re-weighted over the parts a run has, with `quality = 0.35 static + 0.30 probes + 0.35 review` re-weighted the same
+way. Each part is 0 to 1:
+
+- **correctness**: the share of hidden tests passed (1 or 0 for SWE-bench and polyglot);
+- **instruction following**: the benchmark's checks averaged with three checks every run gets (no package installs,
+  finished within the time limit, a real final summary);
+- **quality**: static analysis, behaviour probes and judge reviews (the mean over judges of their overall score / 10);
+- **efficiency**: `1 − log2(wall time / reference) / 4`, clamped to 0..1, so it reaches 0 at 16 times slower than the
+  reference. The reference is the fastest local run on the same benchmark that passed (correctness ≥ the pass
+  threshold, 0.8 by default), or with `efficiency_ref="all"` the fastest run of any kind.
+
+Weights, the pass threshold and the efficiency reference are adjustable live on the dashboard and in `results()`.
+Iterations report mean, standard deviation, 95% CI and pass@k.
 
 ## Safety and reliability
 
-* **Panic stop** (`POST /api/system/panic`, the red sidebar button, Ctrl+Shift+X): cancels every job, marks running
+* **Panic stop** (`POST /api/system/panic`, the red sidebar button or Ctrl+Shift+X, then a confirmation): cancels every job, marks running
   and queued runs of active plans cancelled, removes all containers labelled `org.llmdyno.role` (proxies first, which
   cuts agents off from paid APIs immediately), and kills llama-server plus any stray copy still holding the port.
   Paused plans and finished results are left alone. Stopping the server does the same for containers and llama-server.
 * **Spend ledgers**: each writer (every run's proxy, and the host for judging and quick tests) owns one shard file per
-  ledger, `data/ledgers/<ledger>__<writer>.json`, and readers sum the shards. Parallel runs therefore never overwrite
-  each other's spend. Requests cut off mid-stream are still booked, from a size-based estimate.
+  ledger, `<data>/ledgers/<ledger>__<writer>.json`, and readers sum the shards. Parallel runs therefore never
+  overwrite each other's spend. Requests cut off mid-stream are still booked, from a size-based estimate. The proxy
+  refuses requests once a provider's or plan's ledger reaches its budget. Judging and quick tests run on the host:
+  their spend is booked to the provider's ledger, and a judging job stops at its own budget.
 * **Stale connections**: the proxy drops agent connections idle for 30 minutes and gives up on an upstream that sends
   nothing for `proxy_idle_timeout_s` (15 minutes by default). The WebSocket server cleans up a closed tab at once and
   tells a client that cannot keep up to resync instead of buffering without limit; the browser reconnects after 50 s
@@ -185,8 +253,9 @@ dashboard. Iterations report mean, standard deviation, 95% CI and pass@k.
 
 ## Versioning
 
-LLMDyno uses Semantic Versioning; `llmdyno/__init__.py` holds the only copy of the version (pyproject reads it,
-`scripts/bump_version.py` updates `frontend/package.json` and the changelog). The database schema version is SQLite's
+LLMDyno uses Semantic Versioning; `llmdyno/__init__.py` holds the source of the version (pyproject reads it, and
+`scripts/bump_version.py` writes it into the frontend and JS packages and their lock files, `js/src/version.ts`,
+`CITATION.cff`, `codemeta.json`, the bug report template and the changelog; tests check they agree). The database schema version is SQLite's
 `user_version`: `db.SCHEMA_VERSION` plus a `MIGRATIONS` table of upgrade steps, and a data folder written by a newer
 release is refused rather than modified. Every run's snapshot records the LLMDyno version that produced it, and
 result exports carry it in their file name and header.

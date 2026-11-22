@@ -19,7 +19,8 @@ from typing import Any, Callable, Self, TypeVar
 from ..errors import LLMDynoError
 from ._backend import LocalBackend, backend, call
 
-TERMINAL = ("done", "failed", "cancelled", "paused")
+# a job is "interrupted" when the server restarted while it ran; it never continues by itself
+TERMINAL = ("done", "failed", "cancelled", "paused", "interrupted")
 
 # ------------------------------------------------------------------ route coverage
 ROUTES: dict[str, list[str]] = {}
@@ -103,6 +104,7 @@ class Handle:
 
     @property
     def id(self) -> str:
+        """The object's id (prof_…, plan_…, run_…, …)."""
         return self._id
 
     @property
@@ -131,6 +133,7 @@ class Handle:
         return self._data[key]
 
     def get(self, key: str, default: Any = None) -> Any:
+        """One field of the object's data, or default when it is missing."""
         return self._data.get(key, default)
 
     def __eq__(self, other: object) -> bool:
@@ -152,11 +155,12 @@ class Job(Handle):
 
     @property
     def status(self) -> str:
-        """queued, running, done, failed, cancelled or paused (fetched fresh)."""
+        """queued, running, done, failed, cancelled, paused or interrupted (fetched fresh)."""
         return self._fresh()["status"]
 
     @property
     def title(self) -> str:
+        """What the job does, as the Activity page shows it."""
         return self._data.get("title") or ""
 
     @property
@@ -166,6 +170,7 @@ class Job(Handle):
 
     @property
     def result(self) -> dict[str, Any]:
+        """What the job produced, read from the server (empty until it is done)."""
         return self._fresh().get("result") or {}
 
     @property
@@ -180,7 +185,7 @@ class Job(Handle):
 
     def wait(self, quiet: bool = False, verbose: bool = False, every_s: float = 2.0) -> dict[str, Any]:
         """Block until the job ends, printing its progress, and return its result. Ctrl+C cancels the job;
-        a failed or cancelled job raises LLMDynoError."""
+        a failed, cancelled, paused or interrupted job raises LLMDynoError."""
         seen, last_detail, last_print = 0, None, 0.0
         j = self._fresh()
         try:
@@ -209,8 +214,9 @@ class Job(Handle):
         if j["status"] == "failed":
             tail = "\n".join(ln for ln in (j.get("log") or "").splitlines()[-12:] if ln.strip())
             raise LLMDynoError(f"{j['title']} failed: {j.get('detail')}\n{tail}".rstrip())
-        if j["status"] in ("cancelled", "paused"):
-            raise LLMDynoError(f"{j['title']} was {j['status']}")
+        if j["status"] in ("cancelled", "paused", "interrupted"):
+            why = f": {j['detail']}" if j["status"] == "interrupted" and j.get("detail") else ""
+            raise LLMDynoError(f"{j['title']} was {j['status']}{why}")
         return j.get("result") or {}
 
     def drain(self, timeout_s: float = 120) -> None:

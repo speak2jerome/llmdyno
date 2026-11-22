@@ -2,9 +2,9 @@
 """Which library call gives access to each web API route, so the Python library can do everything the web app does.
 
 SDK functions declare the routes they cover with @covers("METHOD /path"). Routes not covered yet are listed in
-PENDING_ROUTES in the SDK module of their area. tests/test_parity.py fails when a route is neither covered nor pending,
-when a pending route is already covered, or when @covers names a route that does not exist. Release 0.4.0 needs every
-PENDING_ROUTES list empty."""
+PENDING_ROUTES in the SDK module of their area (none are, since 0.5.0). tests/test_parity.py fails when a route is
+neither covered nor pending, when a pending route is already covered, or when @covers names a route that does not
+exist."""
 from __future__ import annotations
 
 from typing import Any

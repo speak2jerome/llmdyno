@@ -2,7 +2,9 @@
 #
 # Copy to .github/workflows/ in your repository. Benchmarks run agents in Docker and local models on a GPU, so this
 # uses a self-hosted runner with Docker (and a GPU for local models); cloud models only need Docker and an API key.
-# Keep a baseline (llmdyno results --json from a good run) in the repository and refresh it when a drop is intended.
+# Keep a baseline in the repository (the current.json this job uploads, from a good run, saved as
+# .llmdyno/baseline.json) and refresh it when a drop is intended. The baseline must use the same profile name and
+# harness, because configurations are matched by name. Pin the LLMDyno version so scores stay comparable.
 name: Agent regression check
 
 on:
@@ -18,15 +20,18 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install LLMDyno
-        run: pip install llmdyno
+        run: pip install "llmdyno==0.6.*"
       - name: Set up images (cached across runs on a self-hosted runner)
-        run: llmdyno setup --harnesses pi
+        run: llmdyno setup --harnesses pi --no-llama-cpp     # drop --no-llama-cpp for local models
       - name: Run the benchmarks
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          llmdyno cloud-model anthropic claude-sonnet-5-5 --name "CI model" --budget-usd 2 --set reasoning_effort=low
-          llmdyno bench "CI model" --benchmarks suite_quick --harnesses pi --name "PR ${{ github.event.number }}" --json > bench.json
+          # --budget-usd on cloud-model is the provider's total cap, which keeps counting across pull requests on a
+          # self-hosted runner; reset it with `llmdyno provider reset-spend anthropic` when it is used up.
+          llmdyno cloud-model anthropic claude-sonnet-5-5 --name "CI model" --budget-usd 20 --set reasoning_effort=low
+          # --budget-usd on bench caps this pull request's run
+          llmdyno bench "CI model" --benchmarks suite_quick --harnesses pi --budget-usd 2 --name "PR ${{ github.event.number }}" --json > bench.json
       - name: Compare with the baseline
         run: llmdyno ci --baseline .llmdyno/baseline.json --plans $(python -c "import json; print(json.load(open('bench.json'))['plans'][0])") --max-drop 2 --save current.json
       - uses: actions/upload-artifact@v4

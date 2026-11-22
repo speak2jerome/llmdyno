@@ -2,13 +2,17 @@ import type { Client } from "./client.ts";
 import { InvalidError } from "./errors.ts";
 import type { Json } from "./handles.ts";
 
+/** Options for results(): the settings of the dashboard's Results page. Weights are relative, not percentages. */
 export interface ResultsOptions {
   /** Include the bundled sample results (default: only when you name its plan). */
   includeSample?: boolean;
-  /** Weights of the final score (defaults 50 / 15 / 25 / 10). */
+  /** Weight of hidden-test correctness in the final score (default 50). */
   correctness?: number;
+  /** Weight of instruction following (default 15). */
   instructionFollowing?: number;
+  /** Weight of code quality (default 25). A number here, unlike bench()'s quality switch. */
   quality?: number;
+  /** Weight of efficiency: speed and cost against the fastest comparable run (default 10). */
   efficiency?: number;
   /** How code quality splits between "static", "probes" and "review". */
   qualityWeights?: Record<string, number>;
@@ -16,10 +20,11 @@ export interface ResultsOptions {
   benchmarks?: string | string[];
   /** A run passes at this correctness (default 0.8). */
   passThreshold?: number;
-  /** "local" or "cloud": what efficiency is measured against. */
+  /** What efficiency is measured against: "local" (the fastest local run, the default) or "all" (the fastest run). */
   efficiencyRef?: string;
 }
 
+/** A table of the results: export() takes "configs", "cells" or "runs"; rows() takes any of them. */
 export type Level = "configs" | "runs" | "cells" | "reviews" | "rubric" | "public";
 
 const pct = (v: unknown): number | null => (v == null ? null : Math.round(Number(v) * 1000) / 10);

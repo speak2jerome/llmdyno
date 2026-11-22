@@ -1,5 +1,6 @@
 """Which settings work best for one local model? Sweep context size and KV-cache type, skip what does not fit,
-and rank the rest. Local only, so it costs nothing but GPU time.
+and rank the rest. Local only, so it costs nothing but GPU time. Needs Docker and a GPU; downloads the model once.
+Up to six settings × two tasks × two iterations = 24 runs.
 
     python examples/local_settings_sweep.py
 """

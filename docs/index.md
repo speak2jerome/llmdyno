@@ -8,10 +8,11 @@ that records every request and enforces budgets. The results come from four sour
 behaviour probes and blind LLM judges. Before a local model downloads, LLMDyno tells you whether it will fit in your
 GPU's memory.
 
-It is a web dashboard, a Python library and a command line, all working on the same data. From JavaScript or TypeScript, `npx llmdyno` starts it and the `llmdyno` npm package drives it.
+It is a web dashboard, a Python library and a command line, all working on the same data. From JavaScript or
+TypeScript, `npx llmdyno` starts it and the `llmdyno` npm package drives it.
 
 ```bash
-pip install llmdyno
+pip install "llmdyno[plot]"        # plain `pip install llmdyno` without the charts
 llmdyno serve --open
 ```
 
@@ -29,6 +30,9 @@ results.plot.leaderboard()
 
 ## Where to go next
 
+- **[Getting started](GETTING_STARTED.md)**: requirements, installing, first-time setup, and a first benchmark from the
+  dashboard, Python, the command line or TypeScript.
+- **[The dashboard](DASHBOARD.md)**: what every page of the web app shows and does.
 - **[Python library and CLI](LIBRARY.md)**: everything the dashboard does, from code or a terminal.
 - **[Integrations](INTEGRATIONS.md)**:
     - pandas and polars, notebooks and charts;
@@ -38,9 +42,13 @@ results.plot.leaderboard()
 - **[Remote mode](REMOTE.md)**: run it on the GPU box, drive it from your laptop.
 - **[JavaScript and TypeScript](JAVASCRIPT.md)**: `npx llmdyno`, the npm client, and benchmarking your own TypeScript agent.
 - **[Benchmarks](BENCHMARKS.md)** and **[Harnesses](HARNESSES.md)**: what is measured, and how to add your own.
-- **[API reference](reference/index.md)**: every public call, generated from the code.
+- **[Configuration](CONFIGURATION.md)** and **[Troubleshooting](TROUBLESHOOTING.md)**: the data folder, settings and
+  environment variables, and what to do when something goes wrong.
+- **Reference**: [the Python API](reference/index.md), [every command](reference/cli.md) and
+  [every web API route](reference/web-api.md), generated from the code.
 
-Source, issues and releases: [github.com/speak2jerome/llmdyno](https://github.com/speak2jerome/llmdyno).
+Source, issues and releases: [github.com/speak2jerome/llmdyno](https://github.com/speak2jerome/llmdyno). What changed in
+each version: [the changelog](CHANGELOG.md).
 
 LLMDyno is part of [Zynxtech open source](https://zynxtech.in/), built by [Jerome Eliezer](https://zynxtech.in/about/). Project page:
 [zynxtech.in/projects/llmdyno](https://zynxtech.in/projects/llmdyno/).

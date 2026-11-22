@@ -58,6 +58,10 @@ async def remote_access(request, call_next):
         return await call_next(request)                  # the web UI's own files carry no data
     client = request.client.host if request.client else None
     if auth.is_local(client, request.headers):
+        origin = auth.cross_site(request.headers)
+        if origin:
+            return JSONResponse({"detail": f"LLMDyno refused a request from the web page at {origin}: only its own "
+                                           "dashboard and programs on this machine may use it."}, status_code=403)
         return await call_next(request)
     if not auth.check(auth.presented(request.headers, request.query_params)):
         return JSONResponse({"detail": auth.refusal()}, status_code=401, headers={"WWW-Authenticate": "Bearer"})
@@ -74,8 +78,10 @@ async def ws(socket: WebSocket):
     of at the next ping; a client too slow to keep up is told to resync instead of silently missing events.
     Remote clients pass the API token as ?token= (browsers cannot set headers on a WebSocket)."""
     client = socket.client.host if socket.client else None
-    if not auth.is_local(client, socket.headers) and not auth.check(auth.presented(socket.headers, socket.query_params)):
-        await socket.close(code=1008)
+    local = auth.is_local(client, socket.headers)
+    if (local and auth.cross_site(socket.headers)) or (
+            not local and not auth.check(auth.presented(socket.headers, socket.query_params))):
+        await socket.close(code=1008)                  # another site's page, or a remote client without the token
         return
     await socket.accept()
     q = events.ClientQueue()

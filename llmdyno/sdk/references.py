@@ -21,19 +21,21 @@ def aa_reference() -> dict[str, Any]:
 
 @covers("POST /api/references/aa/refresh")
 def refresh_aa(force: bool = False) -> dict[str, Any]:
-    """Download the latest Artificial Analysis numbers (cached for a day; the free tier allows 100 requests a day).
+    """Download the latest Artificial Analysis numbers (refreshed at most every 12 hours unless force=True; the free
+    tier allows 100 requests a day).
     Returns {"models", "fetched_at"}."""
     return call("references.aa_refresh", body={"force": force})
 
 
 @covers("PUT /api/settings/aa-key")
 def set_aa_key(key: str) -> dict[str, Any]:
-    """Save an Artificial Analysis API key (encrypted in the data folder)."""
+    """Save an Artificial Analysis API key in the data folder's secret store (free at artificialanalysis.ai)."""
     return call("references.set_aa_key", body={"key": key})
 
 
 @covers("DELETE /api/settings/aa-key")
 def remove_aa_key() -> dict[str, Any]:
+    """Delete the saved Artificial Analysis API key."""
     return call("references.delete_aa_key")
 
 

@@ -40,10 +40,12 @@ class Event:
 
     @property
     def status(self) -> str | None:
+        """The status a run, plan or job event reports, if any."""
         return self.data.get("status") if isinstance(self.data, dict) else None
 
     @property
     def run_id(self) -> str | None:
+        """The run the event is about, if it is about one."""
         if self.topic.startswith("run:"):
             return self.topic[4:]
         return self.data.get("id") if self.kind == "run" and isinstance(self.data, dict) else None

@@ -16,7 +16,7 @@ folder layout or the database schema (with an automatic migration); patch releas
 """
 from typing import TYPE_CHECKING
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
 
 # The public API is gathered in llmdyno.lib (code in llmdyno/sdk) and loaded on first use, so `import llmdyno` stays
 # instant and starts nothing (no database, no Docker, no web server) until you call something. Public names must
